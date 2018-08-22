@@ -59,3 +59,8 @@ let textRemote = document.querySelector("textarea#textRemote")
 let startButton = document.querySelector("button#startButton")
 let sendButton = document.querySelector("button#sendButton")
 let stopButton = document.querySelector("button#stopButton")
+
+startButton.onclick = createConnection
+sendButton.onclick = sendData
+stopButton.onclick = closeDataChannel
+
