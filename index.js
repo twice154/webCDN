@@ -11,6 +11,7 @@ let fileServer = new(nodeStatic.Server)()
 let app = http.createServer(function(req, res) {
   fileServer.serve(req, res)
 }).listen(8080)
+console.log("Node.js Server Listen 8080 Port")
 
 let io = socketIO.listen(app)
 
@@ -19,7 +20,7 @@ io.sockets.on("connection", function(socket) {
 
   // Convenience function to log server messages on the client
   function log() {
-    let array = ["Message from server : "]
+    let array = ["Message from server(log function) : "]
     array.push.apply(array, arguments)
     socket.emit("log", array)
   }
@@ -52,6 +53,7 @@ io.sockets.on("connection", function(socket) {
     }
   })
 
+  /*
   // localhost가 아닌 외부에서 접속했을때, IP정보에 대하여 클라이언트에게 알려줌
   socket.on("ipaddr", function() {
     let ifaces = os.networkInterfaces()
@@ -63,8 +65,11 @@ io.sockets.on("connection", function(socket) {
       })
     }
   })
+  */
 
+  /*
   socket.on('bye', function(){
     console.log('received bye')
   })
+  */
 })
