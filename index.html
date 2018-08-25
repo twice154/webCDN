@@ -7,6 +7,13 @@
   <body>
     <h1>Realtime communication with WebRTC</h1>
 
+    <button id="dataButton">Button</button>
+
+    <div id="videos">
+      <video id="localVideo" autoplay muted playsinline></video>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script src="js/main.js"></script>

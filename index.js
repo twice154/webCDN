@@ -1,7 +1,7 @@
 "use strict"
 
+//////////////////////////////////////////////////
 /* Module Insertion */
-let os = require("os")
 let http = require("http")
 let nodeStatic = require("node-static")
 let socketIO = require("socket.io")
@@ -15,6 +15,7 @@ console.log("Node.js Server Listen 8080 Port")
 
 let io = socketIO.listen(app)
 
+//////////////////////////////////////////////////
 /* SocketIO Connection */
 io.sockets.on("connection", function(socket) {
 
@@ -52,24 +53,4 @@ io.sockets.on("connection", function(socket) {
       socket.emit('full', room);
     }
   })
-
-  /*
-  // localhost가 아닌 외부에서 접속했을때, IP정보에 대하여 클라이언트에게 알려줌
-  socket.on("ipaddr", function() {
-    let ifaces = os.networkInterfaces()
-    for (let dev in ifaces) {
-      ifaces[dev].forEach(function(details) {
-        if (details.family === 'IPv4' && details.address !== '127.0.0.1') {
-          socket.emit('ipaddr', details.address);
-        }
-      })
-    }
-  })
-  */
-
-  /*
-  socket.on('bye', function(){
-    console.log('received bye')
-  })
-  */
 })
