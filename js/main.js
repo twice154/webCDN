@@ -38,9 +38,6 @@ let dataChannelConstraint = null
 
 let dataButton = document.querySelector("#dataButton")
 
-let localVideo = document.querySelector("#localVideo")
-let remoteVideo = document.querySelector("#remoteVideo")
-
 //////////////////////////////////////////////////
 /* Socket.io Room */
 let room = "foo"
@@ -54,7 +51,7 @@ if (room != '') {
 socket.on("created", function(room) {
   console.log("Created room " + room)
   isInitiator = true
-  console.log("You are the initiator of this room ${room}! : ${isInitiator}")
+  console.log("You are the initiator of this room " + room + " : " + isInitiator)
 })
 socket.on("full", function(room) {
   console.log("Room " + room + " is full")
@@ -71,11 +68,55 @@ socket.on('joined', function(room) {
 })
 socket.on("ready", function() {
   console.log("Two sockets are ready to connect")
-  
+  createPeerConnection(isInitiator, pcConstraint)
 })
 socket.on('log', function(array) {
   console.log.apply(console, array)
 })
+function createPeerConnection(isInitiator, pcConfig) {
+  peerConnection = new RTCPeerConnection(pcConfig)
+  console.log("Created RTCPeerConnection")
+  isStarted = true
+
+  peerConnection.onicecandidate = function(event) {
+    console.log("My icecandidate event : ", event)
+    if(event.candidate) {
+      sendMessage({
+        type : "candidate",
+        label : event.candidate.sdpMLineIndex,
+        id : event.candidate.sdpMid,
+        candidate : event.candidate.candidate
+      })
+    } else {
+      console.log("My end of candidates")
+    }
+  }
+
+  // Creating Data Channel
+  if(isInitiator) {
+    console.log("Creating Data Channel")
+    dataChannel = peerConnection.createDataChannel("webCDN")
+    console.log("Created Data Channel")
+    dataChannel.onmessage = function(event) {
+      console.log("I GOT A MESSAGE THROUGH DATA CHANNEL!!!")
+    }
+
+    console.log("Creating an offer")
+    peerConnection.createOffer(setLocalAndSendMessage, function(event) {
+      console.log('createOffer() error: ', event)
+    })
+  } else {
+    peerConnection.ondatachannel = function(event) {
+      console.log("ondatachannel : ", event.channel)
+      dataChannel = event.channel
+      console.log("Received Data Channel")
+
+      dataChannel.onmessage = function(event) {
+        console.log("I GOT A MESSAGE THROUGH DATA CHANNEL!!!")
+      }
+    }
+  }
+}
 
 //////////////////////////////////////////////////
 /* Socket.io Messages <CORE SIGNALING PART> */
@@ -88,6 +129,35 @@ socket.on("message", function(message) {
   messageHandling(message)
 })
 function messageHandling(message) {
-  console.log('Client received message:', message);
+  if(message.type === "offer") {
+    if(!isInitiator && !isStarted)
+      createPeerConnection(isInitiator, pcConstraint)
+    
+    peerConnection.setRemoteDescription(new RTCSessionDescription(message))
+    console.log("Creating Answer")
+    peerConnection.createAnswer(setLocalAndSendMessage, function(event) {
+      console.log('createAnswer() error: ', event)
+    })
+  } else if(message.type === "answer" && isStarted) {
+    console.log("I got an answer")
+    peerConnection.setRemoteDescription(new RTCSessionDescription(message))
+  } else if(message.type === "candidate" && isStarted) {
+    let candidate = new RTCIceCandidate({
+      sdpMLineIndex: message.label,
+      candidate: message.candidate
+    })
+    peerConnection.addIceCandidate(candidate)
+  }
+}
 
+//////////////////////////////////////////////////
+/* Callbacks & EventHanlers */
+function setLocalAndSendMessage(sessionDescription) {
+  peerConnection.setLocalDescription(sessionDescription)
+  console.log('setLocalAndSendMessage sending message', sessionDescription)
+  sendMessage(sessionDescription)
+}
+
+dataButton.onclick = function() {
+  dataChannel.send("HI")
 }
