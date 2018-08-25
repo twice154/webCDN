@@ -7,7 +7,7 @@ let nodeStatic = require("node-static")
 let socketIO = require("socket.io")
 
 /* Initialize HTTP Server */
-let fileServer = new(nodeStatic.Server)()
+let fileServer = new(nodeStatic.Server)("../src")
 let app = http.createServer(function(req, res) {
   fileServer.serve(req, res)
 }).listen(8080)
