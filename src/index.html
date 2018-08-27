@@ -7,12 +7,16 @@
   <body>
     <h1>Realtime communication with WebRTC</h1>
 
+    <h2>Data Channel Testing</h2>
     <button id="dataButton">Button</button>
 
-    <ul>
-      <h2>Here's the user list</h2>
-      <li><button>Example(Don't Click!)</button></li>
-    </ul>
+    <h2>File Transfer Testing</h2>
+    <form id="fileInfo">
+      <input type="file" id="fileInput" name="files"/>
+    </form>
+    <button id="fileSendButton">FileSend</button>
+    <a id="download"></a>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script src="js/main.js"></script>
