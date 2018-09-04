@@ -34,7 +34,7 @@ let dataChannelConstraint = null
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
 // URL주소를 통해서 room 구분
-const room = document.URL
+const room = "foo" //document.URL
 
 const socket = io()
 
@@ -60,7 +60,7 @@ socket.on("joined", function(room) {
     // 서버에게 webCDN 피어 소켓아이디를 요청, ACK으로 받은 ID를 통해서 whoSendMeID로 세팅
     socket.emit("requestPeer", room, function(otherPeerID) {
         whoSendMeID = otherPeerID
-        console.log("Set whoSendMeID Complete")
+        console.log("Set whoSendMeID Complete", otherPeerID)
         // Creating PeerConnection - Active Channel
     })
 })

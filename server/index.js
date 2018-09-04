@@ -38,7 +38,7 @@ let socketList = {}
 // socketIO Connecting
 // Built in event
 io.on("connection", (socket) => {
-    conosole.log(`New client joined server : socket.id=${socket.id}`)
+    console.log(`New client joined server : socket.id=${socket.id}`)
 
     socket.on("create or join", (room) => {
         log("Received request to create or join room " + room)
@@ -69,12 +69,19 @@ io.on("connection", (socket) => {
         }
     })
     socket.on("requestPeer", (room, ackCallback) => {
-        ackCallback(findPeer(socketList, socket.id))
+        ackCallback(findPeer(socketList, socket.id, room))
     })
     // Built in event DISCONNECT
     socket.on("disconnect", () => {
         
     })
+
+    // Convenience function to log server messages on the client
+    function log() {
+        let array = ["Message from server : "]
+        array.push.apply(array, arguments)
+        socket.emit("log", array)
+    }
 })
 
 //////////////////////////////////////////////////
@@ -84,32 +91,34 @@ server.listen(port, () => {
 })
 
 //////////////////////////////////////////////////
-// Convenience function to log server messages on the client
-function log() {
-    let array = ["Message from server : "]
-    array.push.apply(array, arguments)
-    socket.emit("log", array)
-}
-
 // Adding Room to socketList
-function adddRoomToList(socketList, room, socketID) {
+function addRoomToList(socketList, room, socketID) {
     socketList[room] = {}
     addClientToRoom(socketList, room, socketID)
 }
 // Adding client to room
 function addClientToRoom(socketList, room, socketID) {
-    socketList[room][socketID] = {}
-    socketList[room][socketID].numOfCurrentPeers = 0
-    socketList[room][socketID].id = socketID
+    socketList[room][idParser(socketID)] = {}
+    socketList[room][idParser(socketID)].numOfCurrentPeers = 0
+    socketList[room][idParser(socketID)].id = socketID
 }
 
 // For finding idle peers
-function findPeer(socketList, myID) {
+function findPeer(socketList, myID, room) {
+    console.log(socketList)
     for(let peerID in socketList[room]) {
-        if(peerID.numOfCurrentPeers < 3) {
+        console.log(typeof(peerID))
+        console.log(peerID.numOfCurrentPeers)
+        if(peerID.numOfCurrentPeers < 3 && peerID.id !== idParser(myID)) {
             // io.sockets.connected[socket.id] : 특정 클라이언트에게만 이벤트를 보내는 방법
             io.sockets.connected[peerID].emit("requestConnect", myID)
+            console.log(peerID.id)
             return peerID.id
         }
     }
+}
+
+// Deleting -, _ in socket.id because it can't be object's key
+function idParser(socketID) {
+    return socketID.split('-').join('').split('_').join('')
 }
