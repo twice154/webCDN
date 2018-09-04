@@ -98,27 +98,35 @@ function addRoomToList(socketList, room, socketID) {
 }
 // Adding client to room
 function addClientToRoom(socketList, room, socketID) {
-    socketList[room][idParser(socketID)] = {}
-    socketList[room][idParser(socketID)].numOfCurrentPeers = 0
-    socketList[room][idParser(socketID)].id = socketID
+    socketList[room][socketID] = {}
+    socketList[room][socketID].numOfCurrentPeers = 0
+    socketList[room][socketID].id = socketID
 }
 
 // For finding idle peers
 function findPeer(socketList, myID, room) {
-    console.log(socketList)
-    for(let peerID in socketList[room]) {
-        console.log(typeof(peerID))
-        console.log(peerID.numOfCurrentPeers)
-        if(peerID.numOfCurrentPeers < 3 && peerID.id !== idParser(myID)) {
-            // io.sockets.connected[socket.id] : 특정 클라이언트에게만 이벤트를 보내는 방법
-            io.sockets.connected[peerID].emit("requestConnect", myID)
-            console.log(peerID.id)
-            return peerID.id
+    Object.keys(socketList[room]).forEach((key, index) => {
+        // 변수를 통한 Object Property접근 시에는 []를 이용한 접근을 해야함!
+        // console.log(socketList[room][key].numOfCurrentPeers)
+        if(socketList[room][key].numOfCurrentPeers < 3 && key != myID) {
+            io.sockets.connected[key].emit("requestConnect", myID)
+            console.log(key)
+            return key
         }
-    }
+    })
+    // for(let peerID in socketList[room]) {
+    //     console.log(typeof(peerID))
+    //     console.log(peerID.numOfCurrentPeers)
+    //     if(peerID.numOfCurrentPeers < 3 && peerID.id !== idParser(myID)) {
+    //         // io.sockets.connected[socket.id] : 특정 클라이언트에게만 이벤트를 보내는 방법
+    //         io.sockets.connected[peerID].emit("requestConnect", myID)
+    //         console.log(peerID.id)
+    //         return peerID.id
+    //     }
+    // }
 }
 
 // Deleting -, _ in socket.id because it can't be object's key
-function idParser(socketID) {
-    return socketID.split('-').join('').split('_').join('')
-}
+// function idParser(socketID) {
+//     return socketID.split('-').join('').split('_').join('')
+// }
