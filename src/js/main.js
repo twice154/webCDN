@@ -60,7 +60,12 @@ socket.on("joined", function(room) {
     // 서버에게 webCDN 피어 소켓아이디를 요청, ACK으로 받은 ID를 통해서 whoSendMeID로 세팅
     socket.emit("requestPeer", room, function(otherPeerID) {
         whoSendMeID = otherPeerID
+        console.log("Set whoSendMeID Complete")
+        // Creating PeerConnection - Active Channel
     })
+})
+socket.on("requestConnect", function(otherPeerID) {
+    console.log("Receiving requestConnect event")
 })
 // 서버에서 보내는 로그들 받는 이벤트리스너
 socket.on("log", function(array) {

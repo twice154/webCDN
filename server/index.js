@@ -69,7 +69,7 @@ io.on("connection", (socket) => {
         }
     })
     socket.on("requestPeer", (room, ackCallback) => {
-        ackCallback(findPeer(socketList))
+        ackCallback(findPeer(socketList, socket.id))
     })
     // Built in event DISCONNECT
     socket.on("disconnect", () => {
@@ -93,22 +93,22 @@ function log() {
 
 // Adding Room to socketList
 function adddRoomToList(socketList, room, socketID) {
-    socketList[`${room}`] = {}
+    socketList[room] = {}
     addClientToRoom(socketList, room, socketID)
 }
 // Adding client to room
 function addClientToRoom(socketList, room, socketID) {
-    socketList[room][`${socketID}`] = {}
-    socketList[`${room}`][`${socketID}`].numOfCurrentPeers = 0
-    socketList[`${room}`][`${socketID}`].id = socketID
+    socketList[room][socketID] = {}
+    socketList[room][socketID].numOfCurrentPeers = 0
+    socketList[room][socketID].id = socketID
 }
 
 // For finding idle peers
-function findPeer(socketList) {
-    for(let peerID in socketList[`${room}`]) {
+function findPeer(socketList, myID) {
+    for(let peerID in socketList[room]) {
         if(peerID.numOfCurrentPeers < 3) {
             // io.sockets.connected[socket.id] : 특정 클라이언트에게만 이벤트를 보내는 방법
-            io.sockets.connected[peerID].emit()
+            io.sockets.connected[peerID].emit("requestConnect", myID)
             return peerID.id
         }
     }
