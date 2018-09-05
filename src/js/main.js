@@ -34,7 +34,7 @@ let dataChannelConstraint = null
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
 // URL주소를 통해서 room 구분
-const room = "foo" //document.URL
+const room = document.URL
 
 const socket = io()
 
@@ -61,11 +61,16 @@ socket.on("joined", function(room) {
     socket.emit("requestPeer", room, function(otherPeerID) {
         whoSendMeID = otherPeerID
         console.log("Set whoSendMeID Complete", whoSendMeID)
-        // Creating PeerConnection - Active Channel
+
+        // Creating PeerConnection - Passive Channel
     })
 })
 socket.on("requestConnect", function(otherPeerID) {
-    console.log("Receiving requestConnect event")
+    setSendPeerID(otherPeerID)
+    console.log("Receiving requestConnect event : ", otherPeerID)
+    console.log(`${peer1ID}, ${peer2ID}, ${peer3ID}`)
+
+    // Creating PeerConnection - Active Channel
 })
 // 서버에서 보내는 로그들 받는 이벤트리스너
 socket.on("log", function(array) {
@@ -84,3 +89,12 @@ socket.on("message", function(message) {
 })
 
 //////////////////////////////////////////////////
+function setSendPeerID(peerID) {
+    if(peer1ID === null) {
+        peer1ID = peerID
+    } else if(peer2ID === null) {
+        peer2ID = peerID
+    } else {
+        peer3ID = peerID
+    }
+}

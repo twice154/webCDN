@@ -105,25 +105,24 @@ function addClientToRoom(socketList, room, socketID) {
 
 // For finding idle peers
 function findPeer(socketList, myID, room) {
-    Object.keys(socketList[room]).forEach((key, index) => {
-        // 변수를 통한 Object Property접근 시에는 []를 이용한 접근을 해야함!
-        // console.log(socketList[room][key].numOfCurrentPeers)
-        if(socketList[room][key].numOfCurrentPeers < 3 && key != myID) {
-            io.sockets.connected[key].emit("requestConnect", myID)
-            console.log(key)
-            return key
-        }
-    })
-    // for(let peerID in socketList[room]) {
-    //     console.log(typeof(peerID))
-    //     console.log(peerID.numOfCurrentPeers)
-    //     if(peerID.numOfCurrentPeers < 3 && peerID.id !== idParser(myID)) {
-    //         // io.sockets.connected[socket.id] : 특정 클라이언트에게만 이벤트를 보내는 방법
-    //         io.sockets.connected[peerID].emit("requestConnect", myID)
-    //         console.log(peerID.id)
-    //         return peerID.id
+    // forEach의 iteration을 멈추는 방법은 없다.
+    // Object.keys(socketList[room]).forEach((key, index) => {
+    //     // 변수를 통한 Object Property접근 시에는 []를 이용한 접근을 해야함!
+    //     // console.log(socketList[room][key].numOfCurrentPeers)
+    //     if(socketList[room][key].numOfCurrentPeers < 3 && key != myID) {
+    //         io.sockets.connected[key].emit("requestConnect", myID)
+    //         console.log(key)
+    //         return key
     //     }
-    // }
+    // })
+    for(let peerID in socketList[room]) {
+        if(socketList[room][peerID].numOfCurrentPeers < 3 && socketList[room][peerID].id !== myID) {
+            socketList[room][peerID].numOfCurrentPeers += 1
+            // io.sockets.connected[socket.id] : 특정 클라이언트에게만 이벤트를 보내는 방법
+            io.sockets.connected[peerID].emit("requestConnect", myID)
+            return socketList[room][peerID].id
+        }
+    }
 }
 
 // Deleting -, _ in socket.id because it can't be object's key
