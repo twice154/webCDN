@@ -61,7 +61,7 @@ io.on("connection", (socket) => {
 
             addClientToRoom(socketList, room, socket.id)
 
-            socket.broadcast.to(room).emit("join", room)
+            // socket.broadcast.to(room).emit("join", room)
             socket.emit("joined", room)
         // room 하나에 100명 초과되면 full로 더 이상 webCDN 동작X
         } else {
@@ -70,6 +70,9 @@ io.on("connection", (socket) => {
     })
     socket.on("requestPeer", (room, ackCallback) => {
         ackCallback(findPeer(socketList, socket.id, room))
+    })
+    socket.on("message", () => {
+        
     })
     // Built in event DISCONNECT
     socket.on("disconnect", () => {
