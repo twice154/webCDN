@@ -20,6 +20,8 @@ socket.on("joined", function(room) {
     console.log("I joined room : " + room)
     
     console.log("Start finding webCDN peer")
+    // request to server to find webCDN peers
+    //
 })
 
 // 서버에서 보내는 로그들 받는 이벤트리스너

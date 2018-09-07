@@ -22,6 +22,10 @@ let clientList = {}
 {
     room1 : [
         {
+            volume : 1642, [Byte]
+            properNumOfPeers : 3, [몇 명의 피어가 나누어서 webCDN 전송을 하는 것이 적절한가]
+        },
+        {
             socketID : fghuirwhg343g324g34,
             downloaded : true,
             numOfCurrentPeers : 1,
@@ -59,6 +63,9 @@ io.on("connection", (socket) => {
             socket.join(room)
             log("Client ID(I) " + socket.id + " created room " + room)
 
+            // fetch and check the website's volume to decide how many peers to connect.
+
+
             listManage.addRoomToList(clientList, room)
             listManage.addClientToRoom(clientList, room, socket.id)
 
@@ -73,7 +80,8 @@ io.on("connection", (socket) => {
             // socket.broadcast.to(room).emit("join", room)
             socket.emit("joined", room)
 
-
+            // request webCDN peers to connect newbie and send data
+            //
         // room 하나에 100명 초과되면 full로 더 이상 webCDN 동작X
         } else {
             socket.emit("full", room)
