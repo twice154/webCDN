@@ -22,20 +22,17 @@ let clientList = {}
 {
     room1 : [
         {
-            volume : 1642, [Byte]
-            properNumOfPeers : 3, [몇 명의 피어가 나누어서 webCDN 전송을 하는 것이 적절한가]
+            volume : 1642, [Mega Byte],
+            numOfImages : 0,
+            numOfSVGs : 0
         },
         {
             socketID : fghuirwhg343g324g34,
-            downloaded : true,
-            numOfCurrentPeers : 1,
-            currentBandwidth : 3
+            downloaded : true
         },
         {
             socketID : f489hf3247g2hg8gw34f,
-            downloaded : false,
-            numOfCurrentPeers : 2,
-            currentBandwidth : 2
+            downloaded : false
         },
         ...
     ],
@@ -63,9 +60,6 @@ io.on("connection", (socket) => {
             socket.join(room)
             log("Client ID(I) " + socket.id + " created room " + room)
 
-            // fetch and check the website's volume to decide how many peers to connect.
-
-
             listManage.addRoomToList(clientList, room)
             listManage.addClientToRoom(clientList, room, socket.id)
 
@@ -79,6 +73,7 @@ io.on("connection", (socket) => {
 
             // socket.broadcast.to(room).emit("join", room)
             socket.emit("joined", room)
+            console.log(clientList)
 
             // request webCDN peers to connect newbie and send data
             //
