@@ -5,6 +5,8 @@ const http = require("http")
 const express = require("express")
 const socketIO = require("socket.io")
 
+const listManage = require("./utils/listManage.js")
+
 const srcPath = path.join(__dirname, "../src")
 const port = process.env.PORT || 3000
 
@@ -20,14 +22,16 @@ let clientList = {}
 {
     room1 : [
         {
-            numOfCurrentPeers : 1,
             socketID : fghuirwhg343g324g34,
-            downloaded : true
+            downloaded : true,
+            numOfCurrentPeers : 1,
+            currentBandwidth : 3
         },
         {
-            numOfCurrentPeers : 2,
             socketID : f489hf3247g2hg8gw34f,
-            downloaded : false
+            downloaded : false,
+            numOfCurrentPeers : 2,
+            currentBandwidth : 2
         },
         ...
     ],
@@ -47,14 +51,16 @@ io.on("connection", (socket) => {
     socket.on("create or join", (room) => {
         log("Received request to create or join room " + room)
 
-        let numClients = ::findClientsInRoom
+        let clientsInRoom = io.sockets.adapter.rooms[room]
+        let numClients = clientsInRoom ? Object.keys(clientsInRoom.sockets).length : 0
         log("Room " + room + " now has " + numClients + " client(s)")
 
         if(numClients === 0) {
             socket.join(room)
             log("Client ID(I) " + socket.id + " created room " + room)
 
-            ::addRoomToList
+            listManage.addRoomToList(clientList, room)
+            listManage.addClientToRoom(clientList, room, socket.id)
 
             socket.emit("created", room)
         // 일단은 room 하나에 100명까지만 핸들링하도록 한다.
@@ -62,16 +68,28 @@ io.on("connection", (socket) => {
             log("Client ID(I) " + socket.id + " joined room " + room)
             socket.join(room)
 
-            ::addClientToRoom
+            listManage.addClientToRoom(clientList, room, socket.id)
 
             // socket.broadcast.to(room).emit("join", room)
             socket.emit("joined", room)
+
+
         // room 하나에 100명 초과되면 full로 더 이상 webCDN 동작X
         } else {
             socket.emit("full", room)
         }
     })
+    // Built in event DISCONNECT : when client disconnected, server is running
+    socket.on("disconnect", () => {
+        
+    })
 
+    // Convenience function to log server messages on the client
+    function log() {
+        let array = ["Message from server : "]
+        array.push.apply(array, arguments)
+        socket.emit("log", array)
+    }
 })
 
 //////////////////////////////////////////////////
