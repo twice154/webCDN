@@ -1,8 +1,12 @@
 //////////////////////////////////////////////////
+/* Variable Initialize */
+
+//////////////////////////////////////////////////
 /* Socket.io Initialize */
 // URL주소를 통해서 room 구분
 const room = "foo"//document.URL
 
+// 나중에 connectWebCDN 이라는 함수안에 묶어서 webCDN 접속기준에 대하여 정의 및 모듈화
 const socket = io()
 
 if(room != '') {
@@ -28,3 +32,15 @@ socket.on("joined", function(room) {
 socket.on("log", function(array) {
     console.log.apply(console, array)
 })
+
+//////////////////////////////////////////////////
+/* Socket.io Messages <CORE SIGNALING PART> */
+
+//////////////////////////////////////////////////
+/* etc */
+
+//////////////////////////////////////////////////
+/* Modularization : webrtcFunction.js */
+
+//////////////////////////////////////////////////
+/* Modularization : mediaFunction.js */
