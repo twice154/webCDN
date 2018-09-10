@@ -22,20 +22,14 @@ let clientList = {}
 {
     room1 : [
         {
-            volume : 1642, [Byte]
-            properNumOfPeers : 3, [몇 명의 피어가 나누어서 webCDN 전송을 하는 것이 적절한가]
-        },
-        {
             socketID : fghuirwhg343g324g34,
-            downloaded : true,
-            numOfCurrentPeers : 1,
-            currentBandwidth : 3
+            downloaded : [1, 1, 0, 0, 0, ...],
+            numOfCurrentPeers : 1
         },
         {
             socketID : f489hf3247g2hg8gw34f,
-            downloaded : false,
-            numOfCurrentPeers : 2,
-            currentBandwidth : 2
+            downloaded : [1, 1, 0, 0, 0, ...],
+            numOfCurrentPeers : 2
         },
         ...
     ],
@@ -68,12 +62,16 @@ io.on("connection", (socket) => {
 
             socket.emit("created", room)
         // 일단은 room 하나에 100명까지만 핸들링하도록 한다.
-        } else if(numClients < 100) {
+        } else if(numClients < listManage.determineMaxNumOfRoom()) {
             log("Client ID(I) " + socket.id + " joined room " + room)
             socket.join(room)
 
             listManage.addClientToRoom(clientList, room, socket.id)
-            socket.emit("joined", room)
+
+            socket.emit("joined", {
+                room,
+                numInThisRoom : listManage.numOfClientsInRoom(clientList, room)
+            })
         // room 하나에 100명 초과되면 full로 더 이상 webCDN 동작X
         } else {
             socket.emit("full", room)

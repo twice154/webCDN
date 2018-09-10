@@ -20,12 +20,16 @@ socket.on("created", function(room) {
 socket.on("full", function(room) {
     console.log("Room " + room + " is now full. You can't participate webCDN")
 })
-socket.on("joined", function(room) {
-    console.log("I joined room : " + room)
-    
-    console.log("Start finding webCDN peer")
-    // request to server to find webCDN peers
-    //
+socket.on("joined", function(roomInfo) {
+    console.log("I joined room : " + roomInfo.room)
+
+    if(roomInfo.numInThisRoom < determineOptimisticPeerNum()) {
+        startLazyLoadFromServer()
+    } else {
+        console.log("Start finding webCDN peer")
+        // request to server to find webCDN peers
+        
+    }
 })
 
 // 서버에서 보내는 로그들 받는 이벤트리스너
@@ -38,9 +42,17 @@ socket.on("log", function(array) {
 
 //////////////////////////////////////////////////
 /* etc */
+function determineOptimisticPeerNum() {
+    // 15 : 동시에 파티션을 전송하게 될 피어의 수
+    // 5 : 오류가 났을 때, 대응할 수 있는 Max 피어의 배율
+    return 15 * 3
+}
 
 //////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
 
 //////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
+function startLazyLoadFromServer() {
+
+}
