@@ -8,10 +8,11 @@
         <h1>webCDN TestBed</h1>
 
         <!-- lazy loaded from server first -->
-        <img id="wikipediaImage" alt="wikipedia" data-src="https://wikipedia.org/static/images/project-logos/frwiki-1.5x.png">
-        <img id="cityImage" alt="city" data-src="resource/4K City.jpg">
-        <!-- loaded from p2p -->
-        <img id="naverImage" alt="naver" data-src="https://s.pstatic.net/static/www/mobile/edit/2018/0904/cropImg_166x108_136518491134958352.png">
+        <img id="wikipediaImage" alt="wikipedia" data-src="https://wikipedia.org/static/images/project-logos/frwiki-1.5x.png" src="">
+        <img id="cityImage" alt="city" data-src="resource/4K City.jpg" src="">
+        <!-- loaded from p2p if I lazy load the first viewport user see -->
+        <div id="backgroundImage" data-src="https://s.pstatic.net/static/www/mobile/edit/2018/0904/cropImg_166x108_136518491134958352.png" style="background-image: ''; height: 200px;"></div>
+        <img id="naverImage" alt="naver" data-src="https://s.pstatic.net/static/www/mobile/edit/2018/0904/cropImg_166x108_136518491134958352.png" src="">
         
         <!--
         <video id="cltemVideo" width="320" height="240" controls>
@@ -23,6 +24,6 @@
         <script src="js/firstLazyLoad.js"></script>
         <script src="/socket.io/socket.io.js"></script>
         <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
-        <script src="js/main.js"></script>
+        <script src="js/webCDN.js"></script>
     </body>
 </html>

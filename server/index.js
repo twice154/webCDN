@@ -6,6 +6,7 @@ const express = require("express")
 const socketIO = require("socket.io")
 
 const listManage = require("./utils/listManage.js")
+const peerManage = require("./utils/peerManage.js")
 
 const srcPath = path.join(__dirname, "../src")
 const port = process.env.PORT || 3000
@@ -23,13 +24,13 @@ let clientList = {}
     room1 : [
         {
             socketID : fghuirwhg343g324g34,
-            downloaded : [1, 1, 0, 0, 0, ...],
-            numOfCurrentPeers : 1
+            downloaded : [true, true, false, false, false, ...],
+            numOfCurrentUploadPeers : 1
         },
         {
             socketID : f489hf3247g2hg8gw34f,
-            downloaded : [1, 1, 0, 0, 0, ...],
-            numOfCurrentPeers : 2
+            downloaded : [true, true, false, false, false, ...],
+            numOfCurrentUploadPeers : 2
         },
         ...
     ],

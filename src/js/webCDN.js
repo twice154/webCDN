@@ -15,16 +15,20 @@ if(room != '') {
 }
 
 socket.on("created", function(room) {
+    startLoadFromServer()
+    
     console.log("Created room " + room)
 })
 socket.on("full", function(room) {
+    startLoadFromServer()
+
     console.log("Room " + room + " is now full. You can't participate webCDN")
 })
 socket.on("joined", function(roomInfo) {
     console.log("I joined room : " + roomInfo.room)
 
     if(roomInfo.numInThisRoom < determineOptimisticPeerNum()) {
-        startLazyLoadFromServer()
+        startLoadFromServer()
     } else {
         console.log("Start finding webCDN peer")
         // request to server to find webCDN peers
@@ -53,6 +57,22 @@ function determineOptimisticPeerNum() {
 
 //////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
-function startLazyLoadFromServer() {
+function startLoadFromServer() {
+    // Top-down 으로 가져오기 때문에 위에서부터 차례대로 렌더링 가능
+    const images = document.querySelectorAll("[data-src]")
+    images.forEach(function(image, index) {
+        const dataSource = image.getAttribute("data-src")
+        if(!dataSource)
+            return
 
+        // html에서 이미지를 삽입한 케이스
+        if(image.getAttribute("src") !== null && image.getAttribute("src") === "") {
+            image.src = dataSource
+        // css에서 이미지를 삽입한 케이스
+        } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
+            image.style["background-image"] = `url(${dataSource})`
+        } else {
+            console.log("There is not src tag & backgroun-image property")
+        }
+    })
 }

@@ -6,7 +6,7 @@ module.exports.addClientToRoom = (clientList, room, socketID) => {
     let newClient = {
         socketID : socketID,
         downloaded : new Array(50),
-        numOfCurrentPeers : 0
+        numOfCurrentUploadPeers : 0
     }
     clientList[room].push(newClient)
 }
