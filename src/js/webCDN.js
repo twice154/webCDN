@@ -75,6 +75,14 @@ socket.on("log", function(array) {
 
 //////////////////////////////////////////////////
 /* Socket.io Messages <CORE SIGNALING PART> */
+function sendMessage(message) {
+    console.log('Client(I) sending message: ', message);
+    socket.emit('message', message);
+}
+socket.on("message", function(message) {
+    console.log("Client received message : ", message)
+    messageHandling(message)
+})
 
 //////////////////////////////////////////////////
 /* etc */
@@ -87,23 +95,75 @@ function determineOptimisticPeerNum() {
 //////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
 function createPeerConnectionForReceiveChannel(pcList, dcList, pcConfig, dcConfig, pIdList) {
+    for(let i=0; i<pIdList.length; i++) {
+        pcList[i] = new RTCPeerConnection(pcConfig)
+        console.log("Created receive RTCPeerConnection")
 
+        pcList[i].onicecandidate = function(event) {
+            console.log("My icecandidate event : ", event)
+            if(event.candidate) {
+                sendMessage({
+                    type : "candidate",
+                    label : event.candidate.sdpMLineIndex,
+                    id : event.candidate.sdpMid,
+                    candidate : event.candidate.candidate,
+                    to : pIdList[i]
+                })
+            } else {
+                console.log("My end of candidates")
+            }
+        }
+
+        pcList[i].ondatachannel = function(event) {
+            console.log("ondatachannel : ", event.channel)
+            dcList[i] = event.channel
+            dcList[i].binaryType = "arraybuffer"
+            console.log("Received receive DataChannel")
+
+            dcList.onmessage = function(event) {
+                // Receiving image data
+                receiveCDN()
+            }
+        }
+    }
 }
 function createPeerConnectionForSendChannel(pcList, dcList, pcConfig, dcConfig, pIdList) {
-    pcList[pcList.length] = new RTCPeerConnection(pcConfig)
-    console.log("Created send RTCPeerConnection")
+    for(let i=0; i<=pcList.length; i++) {
+        // 나중에 연결종료하고나서 null이 아니라 undefined로 만들어 줘야함
+        if(pcList[i] === undefined && dcList[i] === undefined) {
+            pcList[i] = new RTCPeerConnection(pcConfig)
+            console.log("Created send RTCPeerConnection")
 
-    pcList[pcList.length].onicecandidate = function(event) {
-        console.log("My icecandidate event : ", event)
-        if(event.candidate) {
-            sendMessage({
-                type : "candidate",
-                label : event.candidate.sdpMLineIndex,
-                id : event.candidate.sdpMid,
-                candidate : event.candidate.candidate
+            pcList[i].onicecandidate = function(event) {
+                console.log("My icecandidate event : ", event)
+                if(event.candidate) {
+                    sendMessage({
+                        type : "candidate",
+                        label : event.candidate.sdpMLineIndex,
+                        id : event.candidate.sdpMid,
+                        candidate : event.candidate.candidate,
+                        to : pIdList
+                    })
+                } else {
+                    console.log("My end of candidates")
+                }
+            }
+
+            dcList[i] = pcList[i].createDataChannel(`sendingData${i}`)
+            dcList[i].binaryType = "arraybuffer"
+            console.log("Created send DataChannel")
+
+            dcList[i].onopen = function() {
+                // Sending image data
+                sendCDN()
+            }
+
+            pcList[i].createOffer(setLocalAndSendMessage, function(event) {
+                console.log("createOffer() error : ", event)
+                /* This can be alternated by individual error handling function */
             })
-        } else {
-            console.log("My end of candidates")
+            
+            break
         }
     }
 }
@@ -128,4 +188,12 @@ function startLoadFromServer() {
             console.log("There is not src tag & backgroun-image property")
         }
     })
+}
+
+function sendCDN() {
+
+}
+
+function receiveCDN() {
+
 }

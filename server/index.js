@@ -95,6 +95,9 @@ io.on("connection", (socket) => {
             io.to(`${peerIdList[i]}`).emit("requestedPeerList", socket.id)
         }
     })
+    socket.on("message", (message) => {
+        
+    })
     // Built in event DISCONNECT : when client disconnected, server is running
     socket.on("disconnect", () => {
         
