@@ -23,13 +23,13 @@ let clientList = {}
 {
     room1 : [
         {
-            socketID : fghuirwhg343g324g34,
-            downloaded : [true, true, false, false, false, ...],
+            socketId : fghuirwhg343g324g34,
+            downloaded : true,
             numOfCurrentUploadPeers : 1
         },
         {
-            socketID : f489hf3247g2hg8gw34f,
-            downloaded : [true, true, false, false, false, ...],
+            socketId : f489hf3247g2hg8gw34f,
+            downloaded : false,
             numOfCurrentUploadPeers : 2
         },
         ...
@@ -76,6 +76,23 @@ io.on("connection", (socket) => {
         // room 하나에 100명 초과되면 full로 더 이상 webCDN 동작X
         } else {
             socket.emit("full", room)
+        }
+    })
+    socket.on("requestPeerList", (room) => {
+        let peerIdList = []
+        
+        for(let i=0; i<clientList[room].length; i++) {
+            if(peerIdList.length === peerManage.determineOptimisticPeerIdArrayNum())
+                break
+            if(clientList[room][i].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum())
+                peerIdList.push(clientList[room][i].socketId)
+                clientList[room][i].numOfCurrentUploadPeers += 1
+        }
+        // 새로 접속한 피어에게
+        socket.emit("requestedPeerList", peerIdList)
+        // 기존에 있던 피어들에게
+        for(let i=0; i<peerIdList.length; i++) {
+            io.to(`${peerIdList[i]}`).emit("requestedPeerList", socket.id)
         }
     })
     // Built in event DISCONNECT : when client disconnected, server is running

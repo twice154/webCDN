@@ -1,5 +1,27 @@
 //////////////////////////////////////////////////
 /* Variable Initialize */
+let receivePeerConnectionList = []
+let receiveDataChannelList = []
+
+let sendPeerConnectionList = []
+let sendDataChannelList = []
+
+/*
+let turnReady = false
+*/
+/* Some Constraints */
+let pcConstraint = {
+    'iceServers': [{
+        'urls' : 'stun:stun.l.google.com:19302'
+    },
+    /*
+    {
+        "urls" : "turn:numb.viagenie.ca",
+        "credential" : "123456",
+        "username" : "terranada@naver.com"
+    }*/]
+}
+let dcConstraint = null
 
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
@@ -31,8 +53,18 @@ socket.on("joined", function(roomInfo) {
         startLoadFromServer()
     } else {
         console.log("Start finding webCDN peer")
-        // request to server to find webCDN peers
         
+        // request to server to find webCDN peers
+        socket.emit("requestPeerList", roomInfo.room)
+    }
+})
+socket.on("requestedPeerList", function(peerIdList) {
+    if(Array.isArray(peerIdList)) {
+        createPeerConnection(receivePeerConnectionList, receiveDataChannelList, pcConstraint, dcConstraint, peerIdList)
+        console.log("requestPeerList : I'm newbie")
+    } else if(typeof(peerIdList) === "string") {
+        createPeerConnection(sendPeerConnectionList, sendDataChannelList, pcConstraint, dcConstraint, peerIdList)
+        console.log("requestPeerList : I'm oldbie")
     }
 })
 
@@ -48,12 +80,15 @@ socket.on("log", function(array) {
 /* etc */
 function determineOptimisticPeerNum() {
     // 15 : 동시에 파티션을 전송하게 될 피어의 수
-    // 5 : 오류가 났을 때, 대응할 수 있는 Max 피어의 배율
-    return 15 * 3
+    //  : 오류가 났을 때, 대응할 수 있는 Max 피어의 배율
+    return 1//15 * 3
 }
 
 //////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
+function createPeerConnection(pcList, dcList, pcConfig, dcConfig, pIdList) {
+
+}
 
 //////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */

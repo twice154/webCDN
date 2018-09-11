@@ -2,9 +2,9 @@ module.exports.addRoomToList = (clientList, room) => {
     clientList[room] = []
 }
 
-module.exports.addClientToRoom = (clientList, room, socketID) => {
+module.exports.addClientToRoom = (clientList, room, socketId) => {
     let newClient = {
-        socketID : socketID,
+        socketId : socketId,
         downloaded : new Array(50),
         numOfCurrentUploadPeers : 0
     }
