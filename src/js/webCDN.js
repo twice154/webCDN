@@ -60,10 +60,10 @@ socket.on("joined", function(roomInfo) {
 })
 socket.on("requestedPeerList", function(peerIdList) {
     if(Array.isArray(peerIdList)) {
-        createPeerConnection(receivePeerConnectionList, receiveDataChannelList, pcConstraint, dcConstraint, peerIdList)
+        createPeerConnectionForReceiveChannel(receivePeerConnectionList, receiveDataChannelList, pcConstraint, dcConstraint, peerIdList)
         console.log("requestPeerList : I'm newbie")
     } else if(typeof(peerIdList) === "string") {
-        createPeerConnection(sendPeerConnectionList, sendDataChannelList, pcConstraint, dcConstraint, peerIdList)
+        createPeerConnectionForSendChannel(sendPeerConnectionList, sendDataChannelList, pcConstraint, dcConstraint, peerIdList)
         console.log("requestPeerList : I'm oldbie")
     }
 })
@@ -86,8 +86,26 @@ function determineOptimisticPeerNum() {
 
 //////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
-function createPeerConnection(pcList, dcList, pcConfig, dcConfig, pIdList) {
+function createPeerConnectionForReceiveChannel(pcList, dcList, pcConfig, dcConfig, pIdList) {
 
+}
+function createPeerConnectionForSendChannel(pcList, dcList, pcConfig, dcConfig, pIdList) {
+    pcList[pcList.length] = new RTCPeerConnection(pcConfig)
+    console.log("Created send RTCPeerConnection")
+
+    pcList[pcList.length].onicecandidate = function(event) {
+        console.log("My icecandidate event : ", event)
+        if(event.candidate) {
+            sendMessage({
+                type : "candidate",
+                label : event.candidate.sdpMLineIndex,
+                id : event.candidate.sdpMid,
+                candidate : event.candidate.candidate
+            })
+        } else {
+            console.log("My end of candidates")
+        }
+    }
 }
 
 //////////////////////////////////////////////////
