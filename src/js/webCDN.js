@@ -1,6 +1,14 @@
 //////////////////////////////////////////////////
 /* Variable Initialize */
-/* 배열의 원소들은 기본적으로 undefined로 만들어 주는 것을 원칙으로 한다 */
+// {
+//     peerID1(매칭된 상대 피어 소켓아이디) : { 
+//         RTCPeerConnection
+//     },
+//     peerID2 : {
+//         RTCPeerConnection
+//     },
+//     ...
+// }
 // 내가 데이터를 받게 될 피어들
 let receivePeerConnectionList = {}
 let receiveDataChannelList = {}
@@ -63,10 +71,10 @@ socket.on("joined", function(roomInfo) {
 })
 socket.on("requestedPeerList", function(peerIdList) {
     if(Array.isArray(peerIdList)) {
-        createPeerConnectionForReceiveChannel(receivePeerConnectionList, receiveDataChannelList, socket.id, pcConstraint, dcConstraint, peerIdList)
+        createPeerConnectionForReceiveChannel(peerIdList)
         console.log("requestPeerList : I'm newbie")
     } else if(typeof(peerIdList) === "string") {
-        createPeerConnectionForSendChannel(sendPeerConnectionList, sendDataChannelList, socket.id, pcConstraint, dcConstraint, peerIdList)
+        createPeerConnectionForSendChannel(peerIdList)
         console.log("requestPeerList : I'm oldbie")
     }
 })
@@ -84,7 +92,7 @@ function sendMessage(message) {
 }
 socket.on("message", function(message) {
     console.log("Client received message : ", message)
-    messageHandling(message, receivePeerConnectionList, sendPeerConnectionList)
+    messageHandling(message)
 })
 
 //////////////////////////////////////////////////
@@ -97,19 +105,11 @@ function determineOptimisticPeerNum() {
 
 //////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
-function messageHandling(message, recvPcList, sndPcList) {
-    if(message.type === "candidateFromReceive" && sndPcList[message.fromListNum] !== undefined) {
-        let candidate = new RTCIceCandidate({
-            sdpMLineIndex : message.label,
-            candidate: message.candidate
-        })
-        sndPcList[message.fromListNum].addIceCandidate(candidate)
-    } else if(message.type === "candidateFromSend" && recvPcList[message.fromListNum] !== undefined) {
-        let candidate = new RTCIceCandidate({
-            sdpMLineIndex : message.label,
-            candidate: message.candidate
-        })
-        recvPcList[message.fromListNum].addIceCandidate(candidate)
+function messageHandling(message) {
+    if(message.type === "candidateFromReceive" && sendPeerConnectionList[message.fromSocket]) {
+
+    } else if(message.type === "candidateFromSend" && receivePeerConnectionList[message.fromSocket]) {
+
     } else if (messgae.type === "offer") {
 
     } else if(message.type === "answer") {
@@ -117,12 +117,13 @@ function messageHandling(message, recvPcList, sndPcList) {
     }
 }
 
-function createPeerConnectionForReceiveChannel(pcList, dcList, sockId, pcConfig, dcConfig, pIdList) {
+// 데이터를 전달받기 위한 Connection을 설정하는 부분
+function createPeerConnectionForReceiveChannel(pIdList) {
     for(let i=0; i<pIdList.length; i++) {
-        pcList[i] = new RTCPeerConnection(pcConfig)
+        receivePeerConnectionList[pIdList[i]] = new RTCPeerConnection(pcConstraint)
         console.log("Created receive RTCPeerConnection")
 
-        pcList[i].onicecandidate = function(event) {
+        receivePeerConnectionList[pIdList[i]].onicecandidate = function(event) {
             console.log("My icecandidate event : ", event)
             if(event.candidate) {
                 sendMessage({
@@ -130,71 +131,61 @@ function createPeerConnectionForReceiveChannel(pcList, dcList, sockId, pcConfig,
                     label : event.candidate.sdpMLineIndex,
                     id : event.candidate.sdpMid,
                     candidate : event.candidate.candidate,
-                    from : sockId,
-                    fromListNum : i,
-                    to : pIdList[i]
+                    fromSocket : socket.id,
+                    toSocket : pIdList[i]
                 })
             } else {
                 console.log("My end of candidates")
             }
         }
 
-        pcList[i].ondatachannel = function(event) {
+        receivePeerConnectionList[pIdList[i]].ondatachannel = function(event) {
             console.log("ondatachannel : ", event.channel)
-            dcList[i] = event.channel
-            dcList[i].binaryType = "arraybuffer"
+            receiveDataChannelList[pIdList[i]] = event.channel
+            receiveDataChannelList[pIdList[i]].binaryType = "arraybuffer"
             console.log("Received receive DataChannel")
 
-            dcList.onmessage = function(event) {
+            receiveDataChannelList[pIdList[i]].onmessage = function(event) {
                 // Receiving image data
                 receiveCDN()
             }
         }
     }
 }
-function createPeerConnectionForSendChannel(pcList, dcList, sockId, pcConfig, dcConfig, pIdList) {
-    for(let i=0; i<=pcList.length; i++) {
-        // 나중에 연결종료하고나서 null이 아니라 undefined로 만들어 줘야함
-        if(pcList[i] === undefined && dcList[i] === undefined) {
-            pcList[i] = new RTCPeerConnection(pcConfig)
-            console.log("Created send RTCPeerConnection")
+// 데이터를 전달하기 위한 Connection을 설정하는 부분
+function createPeerConnectionForSendChannel(pId) {
+    sendPeerConnectionList[pId] = new RTCPeerConnection(pcConstraint)
+    console.log("Created send RTCPeerConnection")
 
-            pcList[i].onicecandidate = function(event) {
-                console.log("My icecandidate event : ", event)
-                if(event.candidate) {
-                    sendMessage({
-                        type : "candidateFromSend",
-                        label : event.candidate.sdpMLineIndex,
-                        id : event.candidate.sdpMid,
-                        candidate : event.candidate.candidate,
-                        from : sockId,
-                        fromListNum : i,
-                        to : pIdList
-                    })
-                } else {
-                    console.log("My end of candidates")
-                }
-            }
-
-            dcList[i] = pcList[i].createDataChannel(`sendingData${i}`)
-            dcList[i].binaryType = "arraybuffer"
-            console.log("Created send DataChannel")
-
-            dcList[i].onopen = function() {
-                // Sending image data
-                sendCDN()
-            }
-
-            pcList[i].createOffer(setLocalAndSendMessage, function(event) {
-                console.log("createOffer() error : ", event)
-                /* This can be alternated by individual error handling function */
+    sendPeerConnectionList[pId].onicecandidate = function(event) {
+        console.log("My icecandidate event : ", event)
+        if(event.candidate) {
+            sendMessage({
+                type : "candidateFromSend",
+                label : event.candidate.sdpMLineIndex,
+                id : event.candidate.sdpMid,
+                candidate : event.candidate.candidate,
+                fromSocket : socket.id,
+                toSocket : pId
             })
-            
-            break
+        } else {
+            console.log("My end of candidates")
         }
     }
-}
 
+    sendDataChannelList[pId] = sendPeerConnectionList[pId].createDataChannel(`from-${socket.id}-to-${pId}`)
+    sendDataChannelList[pId].binaryType = "arraybuffer"
+    console.log("Created send DataChannel")
+
+    sendDataChannelList[pId].onopen = function() {
+        //Sending image data
+        sendCDN()
+    }
+
+    sendPeerConnectionList[pId].createOffer(setLocalAndSendMessage, function(event) {
+        console.log("createOffer() error : ", event)
+    })
+}
 function setLocalAndSendMessage(sessionDescription) {
     pcList[i].setLocalDescription(sessionDescription)
     console.log("setLocalAndSendMessage sending message", sesionDescription)

@@ -108,7 +108,7 @@ io.on("connection", (socket) => {
     socket.on("message", (message) => {
         console.log(`Server got message from client : ${message}`)
         log("Client(I) said : ", message)
-        io.to(`${message.to}`).emit("message", message)
+        io.to(`${message.toSocket}`).emit("message", message)
     })
     // Built in event DISCONNECT : when client disconnected, server is running
     socket.on("disconnect", () => {
