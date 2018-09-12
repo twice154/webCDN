@@ -21,22 +21,22 @@ app.use(express.static(srcPath))
 let clientList = {}
 /*
 {
-    room1 : [
-        {
+    room1 : {
+        fghuirwhg343g324g34 : {
             socketId : fghuirwhg343g324g34,
-            downloaded : true,
+            downloaded : [true],
             numOfCurrentUploadPeers : 1
         },
-        {
+        f489hf3247g2hg8gw34f : {
             socketId : f489hf3247g2hg8gw34f,
-            downloaded : false,
+            downloaded : [false],
             numOfCurrentUploadPeers : 2
         },
         ...
-    ],
-    room2 : [
+    },
+    room2 : {
 
-    ],
+    },
     ...
 }
 */
@@ -80,14 +80,24 @@ io.on("connection", (socket) => {
     })
     socket.on("requestPeerList", (room) => {
         let peerIdList = []
+        let clientKeysInRoom = Object.keys(clientList[room])
         
-        for(let i=0; i<clientList[room].length; i++) {
+        for(let i=0; i<clientKeysInRoom.length; i++) {
             if(peerIdList.length === peerManage.determineOptimisticPeerIdArrayNum())
                 break
-            if(clientList[room][i].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum())
-                peerIdList.push(clientList[room][i].socketId)
-                clientList[room][i].numOfCurrentUploadPeers += 1
+            if(clientList[room][clientKeysInRoom[i]].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum()) {
+                peerIdList.push(clientKeysInRoom[i])
+                clientList[room][clientKeysInRoom[i]].numOfCurrentUploadPeers += 1
+            }
         }
+        // for(let i=0; i<clientList[room].length; i++) {
+        //     if(peerIdList.length === peerManage.determineOptimisticPeerIdArrayNum())
+        //         break
+        //     if(clientList[room][i].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum())
+        //         peerIdList.push(clientList[room][i].socketId)
+        //         clientList[room][i].numOfCurrentUploadPeers += 1
+        // }
+
         // 새로 접속한 피어에게
         socket.emit("requestedPeerList", peerIdList)
         // 기존에 있던 피어들에게
@@ -96,7 +106,9 @@ io.on("connection", (socket) => {
         }
     })
     socket.on("message", (message) => {
-        
+        console.log(`Server got message from client : ${message}`)
+        log("Client(I) said : ", message)
+        io.to(`${message.to}`).emit("message", message)
     })
     // Built in event DISCONNECT : when client disconnected, server is running
     socket.on("disconnect", () => {
