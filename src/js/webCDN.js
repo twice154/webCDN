@@ -196,9 +196,9 @@ function createPeerConnectionForSendChannel(pId) {
 }
 function setLocalAndSendMessage(sessionDescription) {
     if(sessionDescription.type === "offer") {
-
+        sendPeerConnectionList[pId].setLocalDescription(sessionDescription)
     } else if(sessionDescription.type === "answer") {
-        
+        receivePeerConnectionList[pIdList[i]].setLocalDescription(sessionDescription)
     }
 }
 
