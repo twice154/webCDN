@@ -107,9 +107,17 @@ function determineOptimisticPeerNum() {
 /* Modularization : webrtcFunction.js */
 function messageHandling(message) {
     if(message.type === "candidateFromReceive" && sendPeerConnectionList[message.fromSocket]) {
-
+        let candidate = new RTCIceCandidate({
+            sdpMLineIndex : message.label,
+            candidate : message.candidate
+        })
+        sendPeerConnectionList[message.fromSocket].addIceCandidate(candidate)
     } else if(message.type === "candidateFromSend" && receivePeerConnectionList[message.fromSocket]) {
-
+        let candidate = new RTCIceCandidate({
+            sdpMLineIndex : message.label,
+            candidate : message.candidate
+        })
+        receivePeerConnectionList[message.fromSocket].addIceCandidate(candidate)
     } else if (messgae.type === "offer") {
 
     } else if(message.type === "answer") {
@@ -187,9 +195,11 @@ function createPeerConnectionForSendChannel(pId) {
     })
 }
 function setLocalAndSendMessage(sessionDescription) {
-    pcList[i].setLocalDescription(sessionDescription)
-    console.log("setLocalAndSendMessage sending message", sesionDescription)
-    sendMessage(sessionDescription)
+    if(sessionDescription.type === "offer") {
+
+    } else if(sessionDescription.type === "answer") {
+        
+    }
 }
 
 //////////////////////////////////////////////////
