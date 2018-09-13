@@ -60,7 +60,7 @@ socket.on("full", function(room) {
 socket.on("joined", function(roomInfo) {
     console.log("I joined room : " + roomInfo.room)
 
-    if(roomInfo.numInThisRoom < determineOptimisticPeerNum()) {
+    if(roomInfo.numInThisRoom < determineOptimisticPeerNum()/* *3 */) {
         startLoadFromServer()
     } else {
         console.log("Start finding webCDN peer")
@@ -100,7 +100,7 @@ socket.on("message", function(message) {
 function determineOptimisticPeerNum() {
     // 15 : 동시에 파티션을 전송하게 될 피어의 수
     // 3 : 오류가 났을 때, 대응할 수 있는 Max 피어의 배율
-    return 1//15 * 3
+    return 2//15 * 3
 }
 
 //////////////////////////////////////////////////
@@ -171,7 +171,7 @@ function createPeerConnectionForReceiveChannel(pIdList) {
             console.log("Received receive DataChannel")
 
             receiveDataChannelList[pIdList[i]].onmessage = function(event) {
-                // Receiving image data
+                /* Receiving images */
                 console.log("I GOT A MESSAGE THRGOUH DATA CHANNEL")
             }
         }
@@ -203,7 +203,7 @@ function createPeerConnectionForSendChannel(pId) {
     console.log("Created send DataChannel")
 
     sendDataChannelList[pId].onopen = function() {
-        //Sending image data
+        /* Sending images */
         sendDataChannelList[pId].send("HI")
     }
 
