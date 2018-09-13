@@ -118,10 +118,27 @@ function messageHandling(message) {
             candidate : message.candidate
         })
         receivePeerConnectionList[message.fromSocket].addIceCandidate(candidate)
-    } else if (messgae.type === "offer") {
+    } else if (message.sdp.type === "offer" && receivePeerConnectionList[message.fromSocket]) {
+        receivePeerConnectionList[message.fromSocket].setRemoteDescription(new RTCSessionDescription(message.sdp))
 
-    } else if(message.type === "answer") {
+        receivePeerConnectionList[message.fromSocket].createAnswer(
+            function(sessionDescription) {
+                receivePeerConnectionList[message.fromSocket].setLocalDescription(sessionDescription)
+                console.log("createAnswer callback sending message", sessionDescription)
 
+                sendMessage({
+                    sdp : sessionDescription,
+                    fromSocket : message.toSocket,
+                    toSocket : message.fromSocket
+                })
+            },
+            function(event) {
+                console.log('createAnswer() error: ', event)
+            }
+        )
+    } else if(message.sdp.type === "answer" && sendPeerConnectionList[message.fromSocket]) {
+        console.log("I got an answer from remote socket : ", message.fromSocket)
+        sendPeerConnectionList[message.fromSocket].setRemoteDescription(new RTCSessionDescription(message.sdp))
     }
 }
 
@@ -155,7 +172,7 @@ function createPeerConnectionForReceiveChannel(pIdList) {
 
             receiveDataChannelList[pIdList[i]].onmessage = function(event) {
                 // Receiving image data
-                receiveCDN()
+                console.log("I GOT A MESSAGE THRGOUH DATA CHANNEL")
             }
         }
     }
@@ -187,20 +204,32 @@ function createPeerConnectionForSendChannel(pId) {
 
     sendDataChannelList[pId].onopen = function() {
         //Sending image data
-        sendCDN()
+        sendDataChannelList[pId].send("HI")
     }
 
-    sendPeerConnectionList[pId].createOffer(setLocalAndSendMessage, function(event) {
-        console.log("createOffer() error : ", event)
-    })
+    sendPeerConnectionList[pId].createOffer(
+        function(sessionDescription) {
+            sendPeerConnectionList[pId].setLocalDescription(sessionDescription)
+            console.log("createOffer callback sending message", sessionDescription)
+            
+            sendMessage({
+                sdp : sessionDescription,
+                fromSocket : socket.id,
+                toSocket : pId
+            })
+        },
+        function(event) {
+            console.log("createOffer() error : ", event)
+        }
+    )
 }
-function setLocalAndSendMessage(sessionDescription) {
-    if(sessionDescription.type === "offer") {
-        sendPeerConnectionList[pId].setLocalDescription(sessionDescription)
-    } else if(sessionDescription.type === "answer") {
-        receivePeerConnectionList[pIdList[i]].setLocalDescription(sessionDescription)
-    }
-}
+// function setLocalAndSendMessage(sessionDescription) {
+//     if(sessionDescription.type === "offer") {
+//         sendPeerConnectionList[pId].setLocalDescription(sessionDescription)
+//     } else if(sessionDescription.type === "answer") {
+//         receivePeerConnectionList[pIdList[i]].setLocalDescription(sessionDescription)
+//     }
+// }
 
 //////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
@@ -222,12 +251,4 @@ function startLoadFromServer() {
             console.log("There is not src tag & backgroun-image property")
         }
     })
-}
-
-function sendCDN() {
-
-}
-
-function receiveCDN() {
-
 }
