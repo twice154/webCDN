@@ -34,15 +34,6 @@ let pcConstraint = {
 }
 let dcConstraint = null
 
-// Image blob을 모아놓는 리스트, 전송과정에서 임시 블롭 저장소 역할을 하기도 함.
-let imageBlobList = []
-/*
-undefined : to be downloaded
-0 : downloading
-1 : downloaded
-*/
-let downloadStateImageBlobList = []
-
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
 // URL주소를 통해서 room 구분
@@ -57,12 +48,12 @@ if(room != '') {
 }
 
 socket.on("created", function(room) {
-    startLoadImagesFromServer()
+    startLoadFromServer()
     
     console.log("Created room " + room)
 })
 socket.on("full", function(room) {
-    startLoadImagesFromServer()
+    startLoadFromServer()
 
     console.log("Room " + room + " is now full. You can't participate webCDN")
 })
@@ -70,7 +61,7 @@ socket.on("joined", function(roomInfo) {
     console.log("I joined room : " + roomInfo.room)
 
     if(roomInfo.numInThisRoom < determineOptimisticPeerNum()/* *3 */) {
-        startLoadImagesFromServer()
+        startLoadFromServer()
     } else {
         console.log("Start finding webCDN peer")
         
@@ -107,7 +98,9 @@ socket.on("message", function(message) {
 //////////////////////////////////////////////////
 /* etc */
 function determineOptimisticPeerNum() {
-    return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
+    // 15 : 동시에 파티션을 전송하게 될 피어의 수
+    // 3 : 오류가 났을 때, 대응할 수 있는 Max 피어의 배율
+    return 2//15 * 3
 }
 
 //////////////////////////////////////////////////
@@ -177,14 +170,9 @@ function createPeerConnectionForReceiveChannel(pIdList) {
             receiveDataChannelList[pIdList[i]].binaryType = "arraybuffer"
             console.log("Received receive DataChannel")
 
-            // DataChannel이 열렸을 때, sending peer에게 현재 필요한 type과 blob번호를 보낸다.
-            receiveDataChannelList[pIdList[i]].onopen = function() {
-                requestImageToPeer(pIdList[i])
-            }
-
-            // blob을 받고, 적절하게 설정하고, 다음 blob을 요청한다.
             receiveDataChannelList[pIdList[i]].onmessage = function(event) {
-                setAndRequestImageToPeer(event, pIdList[i])
+                /* Receiving images */
+                console.log("I GOT A MESSAGE THRGOUH DATA CHANNEL")
             }
         }
     }
@@ -214,14 +202,9 @@ function createPeerConnectionForSendChannel(pId) {
     sendDataChannelList[pId].binaryType = "arraybuffer"
     console.log("Created send DataChannel")
 
-    // sendDataChannelList[pId].onopen = function() {
-        /* Sending images, static videos, live videos, scripts, svgs */
-        // sendDataChannelList[pId].send("HI")
-    // }
-    
-    // receive peer에게 요청을 받고, 필요한 image, static videos, live videos, scripts, svgs 를 전송해준다.
-    sendDataChannelList[pId].onmessage = function(event) {
-        respondImageToPeer(event, pId)
+    sendDataChannelList[pId].onopen = function() {
+        /* Sending images */
+        sendDataChannelList[pId].send("HI")
     }
 
     sendPeerConnectionList[pId].createOffer(
@@ -250,9 +233,9 @@ function createPeerConnectionForSendChannel(pId) {
 
 //////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
-function startLoadImagesFromServer() {
+function startLoadFromServer() {
+    // Top-down 으로 가져오기 때문에 위에서부터 차례대로 렌더링 가능
     const images = document.querySelectorAll("[data-src]")
-
     images.forEach(function(image, index) {
         const dataSource = image.getAttribute("data-src")
         if(!dataSource)
@@ -268,71 +251,4 @@ function startLoadImagesFromServer() {
             console.log("There is not src tag & backgroun-image property")
         }
     })
-
-    images.forEach(function(image, index) {
-        fetch(`${image.getAttribute("data-src")}`)
-            .then(function(res) {
-                return res.blob()
-            })
-                .then(function(res) {
-                    res.name = image.getAttribute("data-src")
-                    imageBlobList.push(res)
-                })
-    })
-    console.log(imageBlobList)
-}
-
-function requestImageToPeer(pId) {
-    receiveDataChannelList[pId].send(JSON.stringify({
-        num : downloadStateImageBlobList.length
-    }))
-    imageBlobList[downloadStateImageBlobList.length] = []
-    downloadStateImageBlobList[downloadStateImageBlobList.length] = 0
-}
-
-function setAndRequestImageToPeer(event, pId) {
-    if(JSON.parse(event.data).end) {
-        // console.log(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
-        const images = document.querySelectorAll("[data-src]")
-        images[JSON.parse(event.data).num].src = URL.createObjectURL(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
-    } else {
-        // console.log(JSON.parse(event.data).piece.byteLength)
-        imageBlobList[JSON.parse(event.data).num].push(JSON.parse(event.data).piece)
-    }
-}
-
-function respondImageToPeer(event, pId) {
-    let image = imageBlobList[JSON.parse(event.data).num]
-
-    console.log("Image is " + [image.name, image.size, image.type])
-
-    let chunkSize = 16384
-
-    const sliceFile = function(offset) {
-        let reader = new window.FileReader()
-        reader.onload = (function() {
-            return function(e) {
-                sendDataChannelList[pId].send(JSON.stringify({
-                    piece : e.target.result,
-                    name : image.name,
-                    num : JSON.parse(event.data).num,
-                    end : false
-                }))
-
-                if(image.size > offset + e.target.result.byteLength) {
-                    window.setTimeout(sliceFile, 0, offset + chunkSize)
-                } else {
-                    sendDataChannelList[pId].send(JSON.stringify({
-                        name : image.name,
-                        num : JSON.parse(event.data).num,
-                        end : true
-                    }))
-                }
-            }
-        })(image)
-
-        let slice = image.slice(offset, offset + chunkSize)
-        reader.readAsArrayBuffer(slice)
-    }
-    sliceFile(0)
 }
