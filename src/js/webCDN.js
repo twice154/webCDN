@@ -289,7 +289,9 @@ function requestImageToPeer(pId) {
     receiveDataChannelList[pId].send(JSON.stringify({
         num : downloadStateImageBlobList.length
     }))
-    whoSendWhat[pId] = {num : downloadStateImageBlobList.length}
+    whoSendWhat[pId] = {
+        num : downloadStateImageBlobList.length
+    }
     imageBlobList[downloadStateImageBlobList.length] = []
     downloadStateImageBlobList[downloadStateImageBlobList.length] = 0
 }
