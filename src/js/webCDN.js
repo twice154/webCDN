@@ -34,6 +34,7 @@ let pcConstraint = {
 }
 let dcConstraint = null
 
+let whoSendWhat = {}
 // Image blob을 모아놓는 리스트, 전송과정에서 임시 블롭 저장소 역할을 하기도 함.
 let imageBlobList = []
 /*
@@ -265,10 +266,11 @@ function startLoadImagesFromServer() {
         } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
             image.style["background-image"] = `url(${dataSource})`
         } else {
-            console.log("There is not src tag & backgroun-image property")
+            console.log("There is not src tag & background-image property")
         }
     })
 
+    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
     images.forEach(function(image, index) {
         fetch(`${image.getAttribute("data-src")}`)
             .then(function(res) {
@@ -276,7 +278,8 @@ function startLoadImagesFromServer() {
             })
                 .then(function(res) {
                     res.name = image.getAttribute("data-src")
-                    imageBlobList.push(res)
+                    // 따라서 push가 아닌, 강제적으로 원소의 위치를 지정해서 넣어준다.
+                    imageBlobList[index] = res
                 })
     })
     console.log(imageBlobList)
@@ -286,19 +289,33 @@ function requestImageToPeer(pId) {
     receiveDataChannelList[pId].send(JSON.stringify({
         num : downloadStateImageBlobList.length
     }))
+    whoSendWhat[pId] = {num : downloadStateImageBlobList.length}
     imageBlobList[downloadStateImageBlobList.length] = []
     downloadStateImageBlobList[downloadStateImageBlobList.length] = 0
 }
 
 function setAndRequestImageToPeer(event, pId) {
-    if(JSON.parse(event.data).end) {
-        // console.log(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
-        const images = document.querySelectorAll("[data-src]")
-        images[JSON.parse(event.data).num].src = URL.createObjectURL(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
+    if(event.data === "end") {
+        console.log("image blob transmission ended")
+        let concateImage = new window.Blob(imageBlobList[whoSendWhat[pId].num])
+        document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].src = URL.createObjectURL(concateImage)
+        imageBlobList[whoSendWhat[pId].num] = concateImage
     } else {
-        // console.log(JSON.parse(event.data).piece.byteLength)
-        imageBlobList[JSON.parse(event.data).num].push(JSON.parse(event.data).piece)
+        imageBlobList[whoSendWhat[pId].num].push(event.data)
     }
+    console.log(imageBlobList)
+    // console.log(event.data)
+    // if(JSON.parse(event.data).end) {
+    //     console.log("an image p2p finish")
+    //     // console.log(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
+    //     // const images = document.querySelectorAll("[data-src]")
+    //     // images[JSON.parse(event.data).num].src = URL.createObjectURL(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
+    // } else {
+    //     console.log(event.data)
+    //     console.log(JSON.parse(event.data))
+    //     imageBlobList[JSON.parse(event.data).num].push(JSON.parse(event.data).piece)
+    //     console.log(imageBlobList)
+    // }
 }
 
 function respondImageToPeer(event, pId) {
@@ -306,27 +323,50 @@ function respondImageToPeer(event, pId) {
 
     console.log("Image is " + [image.name, image.size, image.type])
 
+    // WebRTC DataChannel API Recommendation
     let chunkSize = 16384
 
     const sliceFile = function(offset) {
         let reader = new window.FileReader()
         reader.onload = (function() {
             return function(e) {
-                sendDataChannelList[pId].send(JSON.stringify({
-                    piece : e.target.result,
-                    name : image.name,
-                    num : JSON.parse(event.data).num,
-                    end : false
-                }))
+                console.log("Sending image blob : end false", e.target.result.byteLength)
+                sendDataChannelList[pId].send(e.target.result)
+                // e.target.result.metadata = {
+                //     name : image.name,
+                //     num : JSON.parse(event.data).num,
+                //     end : false
+                // }
+                // console.log(e.target.result.toString())
+
+                // console.log(e.target.result)
+                // console.log({
+                //     piece : e.target.result,
+                //     name : image.name,
+                //     num : JSON.parse(event.data).num,
+                //     end : false
+                // })
+                // console.log(JSON.stringify({
+                //     piece : e.target.result,
+                //     name : image.name,
+                //     num : JSON.parse(event.data).num,
+                //     end : false
+                // }))
+                
+                // JSON.stringify를 하면서 piece에 저장되어 있는 ArrayBuffer가 빈 Object로 변환된다.
+                // sendDataChannelList[pId].send(JSON.stringify({
+                //     piece : e.target.result,
+                //     name : image.name,
+                //     num : JSON.parse(event.data).num,
+                //     end : false
+                // }))
 
                 if(image.size > offset + e.target.result.byteLength) {
                     window.setTimeout(sliceFile, 0, offset + chunkSize)
                 } else {
-                    sendDataChannelList[pId].send(JSON.stringify({
-                        name : image.name,
-                        num : JSON.parse(event.data).num,
-                        end : true
-                    }))
+                    // image blob을 쪼개서 다 보낸 후, 다 전송되었다고 알리는 flag
+                    console.log("Sending flag : end true", e.target.result.byteLength)
+                    sendDataChannelList[pId].send("end")
                 }
             }
         })(image)
