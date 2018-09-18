@@ -24,12 +24,12 @@ let clientList = {}
     room1 : {
         fghuirwhg343g324g34 : {
             socketId : fghuirwhg343g324g34,
-            downloaded : [true],
+            downloaded : true,
             numOfCurrentUploadPeers : 1
         },
         f489hf3247g2hg8gw34f : {
             socketId : f489hf3247g2hg8gw34f,
-            downloaded : [false],
+            downloaded : false,
             numOfCurrentUploadPeers : 2
         },
         ...
@@ -85,7 +85,7 @@ io.on("connection", (socket) => {
         for(let i=0; i<clientKeysInRoom.length; i++) {
             if(peerIdList.length === peerManage.determineOptimisticPeerIdArrayNum())
                 break
-            if(clientList[room][clientKeysInRoom[i]].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum()) {
+            if(clientList[room][clientKeysInRoom[i]].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum() && clientList[room][clientKeysInRoom[i]].downloaded) {
                 peerIdList.push(clientKeysInRoom[i])
                 clientList[room][clientKeysInRoom[i]].numOfCurrentUploadPeers += 1
             }
@@ -110,6 +110,12 @@ io.on("connection", (socket) => {
         log("Client(I) said : ", message)
         io.to(`${message.toSocket}`).emit("message", message)
     })
+
+    /* Download related signaling */
+    socket.on("allImageDownloadEnded", (room) => {
+        clientList[room][socket.id].downloaded = true
+    })
+
     // Built in event DISCONNECT : when client disconnected, server is running
     socket.on("disconnect", () => {
         

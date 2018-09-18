@@ -5,7 +5,7 @@ module.exports.addRoomToList = (clientList, room) => {
 module.exports.addClientToRoom = (clientList, room, socketId) => {
     let newClient = {
         socketId : socketId,
-        downloaded : [false],
+        downloaded : false,
         numOfCurrentUploadPeers : 0
     }
     clientList[room][socketId] = newClient

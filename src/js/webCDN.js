@@ -34,8 +34,19 @@ let pcConstraint = {
 }
 let dcConstraint = null
 
+/* For P2P Transmission */
+// 어떤 ID의 피어가 현재 어떤 타입의 데이터를, 몇번째 blob을 보내는지 등의 데이터를 보관
+// {
+//     ID1 : {
+//         type : "image",
+//         num : 0, // NodeList에서 몇 번째가 될 것인가
+//         startBlob : 0, // 해당 파일 내부에서
+//         endBlob : 10
+//     },
+//     ...
+// }
 let whoSendWhat = {}
-// Image blob을 모아놓는 리스트, 전송과정에서 임시 블롭 저장소 역할을 하기도 함.
+// Image blob을 모아놓는 리스트, 전송과정에서 임시 blob 저장소 역할을 하기도 함.
 let imageBlobList = []
 /*
 undefined : to be downloaded
@@ -70,7 +81,7 @@ socket.on("full", function(room) {
 socket.on("joined", function(roomInfo) {
     console.log("I joined room : " + roomInfo.room)
 
-    if(roomInfo.numInThisRoom < determineOptimisticPeerNum()/* *3 */) {
+    if(roomInfo.numInThisRoom < determineOptimisticPeerNum()) {
         startLoadImagesFromServer()
     } else {
         console.log("Start finding webCDN peer")
@@ -254,34 +265,34 @@ function createPeerConnectionForSendChannel(pId) {
 function startLoadImagesFromServer() {
     const images = document.querySelectorAll("[data-src]")
 
+    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
     images.forEach(function(image, index) {
         const dataSource = image.getAttribute("data-src")
         if(!dataSource)
             return
 
-        // html에서 이미지를 삽입한 케이스
-        if(image.getAttribute("src") !== null && image.getAttribute("src") === '') {
-            image.src = dataSource
-        // css에서 이미지를 삽입한 케이스
-        } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
-            image.style["background-image"] = `url(${dataSource})`
-        } else {
-            console.log("There is not src tag & background-image property")
-        }
-    })
-
-    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
-    images.forEach(function(image, index) {
         fetch(`${image.getAttribute("data-src")}`)
             .then(function(res) {
                 return res.blob()
             })
                 .then(function(res) {
+                    // html에서 이미지를 삽입한 케이스
+                    if(image.getAttribute("src") !== null && image.getAttribute("src") === '') {
+                        image.src = URL.createObjectURL(res)
+                    // css에서 이미지를 삽입한 케이스
+                    } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
+                        image.style["background-image"] = `url(${URL.createObjectURL(res)})`
+                    } else {
+                        console.log("There is not src tag or background-image property")
+                    }
+
                     res.name = image.getAttribute("data-src")
                     // 따라서 push가 아닌, 강제적으로 원소의 위치를 지정해서 넣어준다.
                     imageBlobList[index] = res
+                    downloadStateImageBlobList[index] = 1
                 })
     })
+    socket.emit("allImageDownloadEnded", room)
     console.log(imageBlobList)
 }
 
@@ -297,7 +308,7 @@ function requestImageToPeer(pId) {
 }
 
 function setAndRequestImageToPeer(event, pId) {
-    if(event.data === "end") {
+    if(event.data === "thisImageDownloadEnded") {
         console.log("image blob transmission ended")
 
         // Setting downloaded blolbs to img
@@ -315,9 +326,26 @@ function setAndRequestImageToPeer(event, pId) {
 
         // Request new blob
         requestImageToPeer(pId)
+    } else if(event.data === "allImageDownloadEnded") {
+
+        // Setting downloaded blolbs to img
+        let concateImage = new window.Blob(imageBlobList[whoSendWhat[pId].num])
+        if(document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].getAttribute("src") !== null && document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].getAttribute("src") === '') {
+            document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].src = URL.createObjectURL(concateImage)
+        } else if(document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].style["background-image"] !== null && document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].style["background-image"] === '') {
+            document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].style["background-image"] = `url(${URL.createObjectURL(concateImage)})`
+        }
+
+        // Set flags
+        imageBlobList[whoSendWhat[pId].num] = concateImage
+        downloadStateImageBlobList[whoSendWhat[pId].num] = 1
+        whoSendWhat[pId].num = -1
+
+        socket.emit("allImageDownloadEnded", room)
     } else {
         imageBlobList[whoSendWhat[pId].num].push(event.data)
     }
+    
     console.log(imageBlobList)
 }
 
@@ -326,22 +354,27 @@ function respondImageToPeer(event, pId) {
 
     console.log("Image is " + [image.name, image.size, image.type])
 
-    // WebRTC DataChannel API Recommendation
+    // WebRTC DataChannel API Recommendation (16KB : 킬로바이트)
     let chunkSize = 16384
 
     const sliceFile = function(offset) {
         let reader = new window.FileReader()
         reader.onload = (function() {
             return function(e) {
-                console.log("Sending image blob : end false", e.target.result.byteLength)
+                console.log("Sending image blob : end image false", e.target.result.byteLength)
                 sendDataChannelList[pId].send(e.target.result)
 
                 if(image.size > offset + e.target.result.byteLength) {
                     window.setTimeout(sliceFile, 0, offset + chunkSize)
                 } else {
                     // image blob을 쪼개서 다 보낸 후, 다 전송되었다고 알리는 flag
-                    console.log("Sending flag : end true", e.target.result.byteLength)
-                    sendDataChannelList[pId].send("end")
+                    if(JSON.parse(event.data).num === imageBlobList.length - 1) {
+                        console.log("Sending flag : end all image true", e.target.result.byteLength)
+                        sendDataChannelList[pId].send("allImageDownloadEnded")
+                    } else {
+                        console.log("Sending flag : end image true", e.target.result.byteLength)
+                        sendDataChannelList[pId].send("thisImageDownloadEnded")
+                    }
                 }
             }
         })(image)
