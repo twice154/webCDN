@@ -260,7 +260,7 @@ function startLoadImagesFromServer() {
             return
 
         // html에서 이미지를 삽입한 케이스
-        if(image.getAttribute("src") !== null && image.getAttribute("src") === "") {
+        if(image.getAttribute("src") !== null && image.getAttribute("src") === '') {
             image.src = dataSource
         // css에서 이미지를 삽입한 케이스
         } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
@@ -299,9 +299,22 @@ function requestImageToPeer(pId) {
 function setAndRequestImageToPeer(event, pId) {
     if(event.data === "end") {
         console.log("image blob transmission ended")
+
+        // Setting downloaded blolbs to img
         let concateImage = new window.Blob(imageBlobList[whoSendWhat[pId].num])
-        document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].src = URL.createObjectURL(concateImage)
+        if(document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].getAttribute("src") !== null && document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].getAttribute("src") === '') {
+            document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].src = URL.createObjectURL(concateImage)
+        } else if(document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].style["background-image"] !== null && document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].style["background-image"] === '') {
+            document.querySelectorAll("[data-src]")[whoSendWhat[pId].num].style["background-image"] = `url(${URL.createObjectURL(concateImage)})`
+        }
+
+        // Set flags
         imageBlobList[whoSendWhat[pId].num] = concateImage
+        downloadStateImageBlobList[whoSendWhat[pId].num] = 1
+        whoSendWhat[pId].num = -1
+
+        // Request new blob
+        requestImageToPeer(pId)
     } else {
         imageBlobList[whoSendWhat[pId].num].push(event.data)
     }
