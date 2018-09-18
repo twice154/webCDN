@@ -47,7 +47,7 @@ let downloadStateImageBlobList = []
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
 // URL주소를 통해서 room 구분
-const room = "foo"//document.URL
+const room = "foo" // document.URL
 
 // 나중에 connectWebCDN 이라는 함수안에 묶어서 webCDN 접속기준에 대하여 정의 및 모듈화
 const socket = io()
@@ -306,18 +306,6 @@ function setAndRequestImageToPeer(event, pId) {
         imageBlobList[whoSendWhat[pId].num].push(event.data)
     }
     console.log(imageBlobList)
-    // console.log(event.data)
-    // if(JSON.parse(event.data).end) {
-    //     console.log("an image p2p finish")
-    //     // console.log(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
-    //     // const images = document.querySelectorAll("[data-src]")
-    //     // images[JSON.parse(event.data).num].src = URL.createObjectURL(new window.Blob(imageBlobList[JSON.parse(event.data).num]))
-    // } else {
-    //     console.log(event.data)
-    //     console.log(JSON.parse(event.data))
-    //     imageBlobList[JSON.parse(event.data).num].push(JSON.parse(event.data).piece)
-    //     console.log(imageBlobList)
-    // }
 }
 
 function respondImageToPeer(event, pId) {
@@ -334,34 +322,6 @@ function respondImageToPeer(event, pId) {
             return function(e) {
                 console.log("Sending image blob : end false", e.target.result.byteLength)
                 sendDataChannelList[pId].send(e.target.result)
-                // e.target.result.metadata = {
-                //     name : image.name,
-                //     num : JSON.parse(event.data).num,
-                //     end : false
-                // }
-                // console.log(e.target.result.toString())
-
-                // console.log(e.target.result)
-                // console.log({
-                //     piece : e.target.result,
-                //     name : image.name,
-                //     num : JSON.parse(event.data).num,
-                //     end : false
-                // })
-                // console.log(JSON.stringify({
-                //     piece : e.target.result,
-                //     name : image.name,
-                //     num : JSON.parse(event.data).num,
-                //     end : false
-                // }))
-                
-                // JSON.stringify를 하면서 piece에 저장되어 있는 ArrayBuffer가 빈 Object로 변환된다.
-                // sendDataChannelList[pId].send(JSON.stringify({
-                //     piece : e.target.result,
-                //     name : image.name,
-                //     num : JSON.parse(event.data).num,
-                //     end : false
-                // }))
 
                 if(image.size > offset + e.target.result.byteLength) {
                     window.setTimeout(sliceFile, 0, offset + chunkSize)
