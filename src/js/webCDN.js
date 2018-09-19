@@ -22,15 +22,16 @@ let turnReady = false
 */
 /* Some Constraints */
 let pcConstraint = {
-    'iceServers': [{
-        'urls' : 'stun:stun.l.google.com:19302'
-    },
+    "iceServers": [{
+        "urls" : "stun:stun.l.google.com:19302"
+    }
     /*
     {
         "urls" : "turn:numb.viagenie.ca",
         "credential" : "123456",
         "username" : "terranada@naver.com"
-    }*/]
+    }*/
+    ]
 }
 let dcConstraint = null
 
@@ -55,7 +56,7 @@ let imageBlobMetaDataRequestNum = 0
 let imageBlobList = []
 /*
 undefined : to be downloaded
-0 : downloading
+array : downloading
 1 : downloaded
 */
 let downloadStateImageBlobList = []
@@ -325,6 +326,7 @@ function startLoadImagesFromServer() {
     console.log("imageBlobList", imageBlobList)
 }
 
+/* image metadata related */
 function requestImageMetaDataToPeer(pId) {
     receiveDataChannelList[pId].send("imageMetaDataRequest")
 }
@@ -353,6 +355,24 @@ function setImageMetaData(imageMetaData) {
     console.log("imageBlobMetaDataListTemp", imageBlobMetaDataListTemp)
 }
 
+function respondImageMetaDataToPeer(pId) {
+    let imageMetaData = []
+
+    imageBlobList.forEach(function(imageBlob, index) {
+        imageMetaData[index] = {
+            name : imageBlob.name,
+            size : imageBlob.size,
+            type : imageBlob.type
+        }
+    })
+
+    imageMetaData.flag = "imageMetaDataResponse"
+
+    sendDataChannelList[pId].send(JSON.stringify(imageMetaData))
+    console.log("imageMetaData", imageMetaData)
+}
+
+/* image data related */
 function requestImageToPeer(pId, startBlobNum, endBlobNum) {
     receiveDataChannelList[pId].send(JSON.stringify({
         num : downloadStateImageBlobList.length,
@@ -365,7 +385,7 @@ function requestImageToPeer(pId, startBlobNum, endBlobNum) {
         endBlobNum
     }
     imageBlobList[downloadStateImageBlobList.length] = []
-    downloadStateImageBlobList[downloadStateImageBlobList.length] = 0
+    downloadStateImageBlobList[downloadStateImageBlobList.length] = []
 }
 
 function setAndRequestImageToPeer(event, pId) {
@@ -408,23 +428,6 @@ function setAndRequestImageToPeer(event, pId) {
     }
     
     console.log(imageBlobList)
-}
-
-function respondImageMetaDataToPeer(pId) {
-    let imageMetaData = []
-
-    imageBlobList.forEach(function(imageBlob, index) {
-        imageMetaData[index] = {
-            name : imageBlob.name,
-            size : imageBlob.size,
-            type : imageBlob.type
-        }
-    })
-
-    imageMetaData.flag = "imageMetaDataResponse"
-
-    sendDataChannelList[pId].send(JSON.stringify(imageMetaData))
-    console.log("imageMetaData", imageMetaData)
 }
 
 function respondImageToPeer(event, pId) {
