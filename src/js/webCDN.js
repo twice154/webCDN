@@ -41,11 +41,16 @@ let dcConstraint = null
 //         type : "image",
 //         num : 0, // NodeList에서 몇 번째가 될 것인가
 //         startBlob : 0, // 해당 파일 내부에서
-//         endBlob : 10
+//         endBlob : 9
 //     },
 //     ...
 // }
 let whoSendWhat = {}
+// 웹페이지의 imageBlob 들의 정보를 가져와서 모아놓는 부분
+let imageBlobMetaDataList
+// 다르게 들어오는 녀석을 임시로 저장해놓기 위함
+let imageBlobMetaDataListTemp
+let imageBlobMetaDataRequestNum = 0
 // Image blob을 모아놓는 리스트, 전송과정에서 임시 blob 저장소 역할을 하기도 함.
 let imageBlobList = []
 /*
@@ -121,6 +126,17 @@ socket.on("message", function(message) {
 function determineOptimisticPeerNum() {
     return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
 }
+function determineOptimisticMetaDataPeerNum() {
+    return 3
+}
+function isJson(arrbuf) {
+    try {
+        JSON.parse(arrbuf);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
 
 //////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
@@ -191,12 +207,21 @@ function createPeerConnectionForReceiveChannel(pIdList) {
 
             // DataChannel이 열렸을 때, sending peer에게 현재 필요한 type과 blob번호를 보낸다.
             receiveDataChannelList[pIdList[i]].onopen = function() {
-                requestImageToPeer(pIdList[i])
+                if(imageBlobMetaDataRequestNum < determineOptimisticMetaDataPeerNum()) {
+                    requestImageMetaDataToPeer(pIdList[i])
+                    imageBlobMetaDataRequestNum += 1
+                    console.log("requestImageMetaDataToPeer")
+                }
+                requestImageToPeer(pIdList[i], 0, 9)
             }
 
             // blob을 받고, 적절하게 설정하고, 다음 blob을 요청한다.
             receiveDataChannelList[pIdList[i]].onmessage = function(event) {
-                setAndRequestImageToPeer(event, pIdList[i])
+                if(isJson(event.data)) {
+                    setImageMetaData(JSON.parse(event.data))
+                } else {
+                    setAndRequestImageToPeer(event, pIdList[i])
+                }
             }
         }
     }
@@ -233,7 +258,11 @@ function createPeerConnectionForSendChannel(pId) {
     
     // receive peer에게 요청을 받고, 필요한 image, static videos, live videos, scripts, svgs 를 전송해준다.
     sendDataChannelList[pId].onmessage = function(event) {
-        respondImageToPeer(event, pId)
+        if(event.data === "imageMetaDataRequest") {
+            respondImageMetaDataToPeer(pId)
+        } else {
+            respondImageToPeer(event, pId)
+        }
     }
 
     sendPeerConnectionList[pId].createOffer(
@@ -293,15 +322,47 @@ function startLoadImagesFromServer() {
                 })
     })
     socket.emit("allImageDownloadEnded", room)
-    console.log(imageBlobList)
+    console.log("imageBlobList", imageBlobList)
 }
 
-function requestImageToPeer(pId) {
+function requestImageMetaDataToPeer(pId) {
+    receiveDataChannelList[pId].send("imageMetaDataRequest")
+}
+
+function setImageMetaData(imageMetaData) {
+    if(!imageBlobMetaDataList) {
+        imageBlobMetaDataList = imageMetaData
+    } else if(imageBlobMetaDataList && !imageBlobMetaDataListTemp) {
+        if(imageBlobMetaDataList.length === imageMetaData.length) {
+            if(!(JSON.stringify(imageBlobMetaDataList) === JSON.stringify(imageMetaData)))
+                imageBlobMetaDataListTemp = imageMetaData
+        } else {
+            imageBlobMetaDataListTemp = imageMetaData
+        }
+    } else if(imageBlobMetaDataList && imageBlobMetaDataListTemp) {
+        if(JSON.stringify(imageBlobMetaDataList) === JSON.stringify(imageMetaData)) {
+            
+        } else if(JSON.stringify(imageBlobMetaDataListTemp) === JSON.stringify(imageMetaData)) {
+            imageBlobMetaDataList = imageMetaData
+        } else {
+            console.log("CRASHING IMAGE META DATA")
+        }
+    }
+
+    console.log("imageBlobMetaDataList", imageBlobMetaDataList)
+    console.log("imageBlobMetaDataListTemp", imageBlobMetaDataListTemp)
+}
+
+function requestImageToPeer(pId, startBlobNum, endBlobNum) {
     receiveDataChannelList[pId].send(JSON.stringify({
-        num : downloadStateImageBlobList.length
+        num : downloadStateImageBlobList.length,
+        startBlobNum,
+        endBlobNum
     }))
     whoSendWhat[pId] = {
-        num : downloadStateImageBlobList.length
+        num : downloadStateImageBlobList.length,
+        startBlobNum,
+        endBlobNum
     }
     imageBlobList[downloadStateImageBlobList.length] = []
     downloadStateImageBlobList[downloadStateImageBlobList.length] = 0
@@ -347,6 +408,23 @@ function setAndRequestImageToPeer(event, pId) {
     }
     
     console.log(imageBlobList)
+}
+
+function respondImageMetaDataToPeer(pId) {
+    let imageMetaData = []
+
+    imageBlobList.forEach(function(imageBlob, index) {
+        imageMetaData[index] = {
+            name : imageBlob.name,
+            size : imageBlob.size,
+            type : imageBlob.type
+        }
+    })
+
+    imageMetaData.flag = "imageMetaDataResponse"
+
+    sendDataChannelList[pId].send(JSON.stringify(imageMetaData))
+    console.log("imageMetaData", imageMetaData)
 }
 
 function respondImageToPeer(event, pId) {
