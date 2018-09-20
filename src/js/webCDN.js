@@ -40,26 +40,39 @@ let dcConstraint = null
 // {
 //     ID1 : {
 //         type : "image",
-//         num : 0, // NodeList에서 몇 번째가 될 것인가
-//         startBlob : 0, // 해당 파일 내부에서
+//         name : "ss",
+//         startBlob : 0,
 //         endBlob : 9
 //     },
 //     ...
 // }
 let whoSendWhat = {}
-// 웹페이지의 imageBlob 들의 정보를 가져와서 모아놓는 부분
-let imageBlobMetaDataList
-// 다르게 들어오는 녀석을 임시로 저장해놓기 위함
-let imageBlobMetaDataListTemp
-let imageBlobMetaDataRequestNum = 0
-// Image blob을 모아놓는 리스트, 전송과정에서 임시 blob 저장소 역할을 하기도 함.
-let imageBlobList = []
+
+/* For Image Transmission */
 /*
+Image blob을 모아놓는 리스트, 전송과정에서 임시 blob 저장소 역할을 하기도 함.
 undefined : to be downloaded
-array : downloading
-1 : downloaded
+1 : downloading
+Blob : downloaded
+// Downloaded의 경우에는 currentDownloadState : 하나의 단일 BLOB이 된다. Array가 아니다.
+{
+    name1 : {
+        currentDownloadState : [Blob, Blob, Blob, Blob, undefined, undefined],
+        size : 30000
+    },
+    name2 : {
+        currentDownloadState : [Blob, Blob, Blob, Blob, 1, 1, 1, 1, 1, 1, undefined, undefined, undefined, undefined, undefinde],
+        size : 10000
+    },
+    ...
+}
+imageMetaData로의 역할도 수행한다.
 */
-let downloadStateImageBlobList = []
+let imageBlobList = {}
+// 다르게 들어오는 metadata를 임시로 저장해놓기 위함
+let imageBlobMetaDataListTemp
+// 총 몇명에게 image metadata를 요청할 것인가
+let imageBlobMetaDataRequestNum = 0
 
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
@@ -128,7 +141,7 @@ function determineOptimisticPeerNum() {
     return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
 }
 function determineOptimisticMetaDataPeerNum() {
-    return 3
+    return 1
 }
 function isJson(arrbuf) {
     try {
@@ -315,11 +328,15 @@ function startLoadImagesFromServer() {
                     } else {
                         console.log("There is not src tag or background-image property")
                     }
-
-                    res.name = image.getAttribute("data-src")
                     // 따라서 push가 아닌, 강제적으로 원소의 위치를 지정해서 넣어준다.
-                    imageBlobList[index] = res
-                    downloadStateImageBlobList[index] = 1
+                    imageBlobList[image.getAttribute("data-src")] = {}
+                    imageBlobList[image.getAttribute("data-src")].currentDownloadState = res
+
+                    imageBlobList[image.getAttribute("data-src")].size = res.size
+
+                    // for(let i=0; i<Math.ceil(res.size / 16384); i++) {
+                    //     downloadStateImageBlobList[image.getAttribute("data-src")].push(2)
+                    // }
                 })
     })
     socket.emit("allImageDownloadEnded", room)
@@ -332,44 +349,23 @@ function requestImageMetaDataToPeer(pId) {
 }
 
 function setImageMetaData(imageMetaData) {
-    if(!imageBlobMetaDataList) {
-        imageBlobMetaDataList = imageMetaData
-    } else if(imageBlobMetaDataList && !imageBlobMetaDataListTemp) {
-        if(imageBlobMetaDataList.length === imageMetaData.length) {
-            if(!(JSON.stringify(imageBlobMetaDataList) === JSON.stringify(imageMetaData)))
-                imageBlobMetaDataListTemp = imageMetaData
-        } else {
-            imageBlobMetaDataListTemp = imageMetaData
-        }
-    } else if(imageBlobMetaDataList && imageBlobMetaDataListTemp) {
-        if(JSON.stringify(imageBlobMetaDataList) === JSON.stringify(imageMetaData)) {
-            
-        } else if(JSON.stringify(imageBlobMetaDataListTemp) === JSON.stringify(imageMetaData)) {
-            imageBlobMetaDataList = imageMetaData
-        } else {
-            console.log("CRASHING IMAGE META DATA")
-        }
-    }
-
-    console.log("imageBlobMetaDataList", imageBlobMetaDataList)
-    console.log("imageBlobMetaDataListTemp", imageBlobMetaDataListTemp)
+    imageBlobList = imageMetaData
+    console.log("received meta imateBlobList", imageBlobList)
 }
 
 function respondImageMetaDataToPeer(pId) {
-    let imageMetaData = []
+    let copiedImageBlobList = {}
 
-    imageBlobList.forEach(function(imageBlob, index) {
-        imageMetaData[index] = {
-            name : imageBlob.name,
-            size : imageBlob.size,
-            type : imageBlob.type
-        }
-    })
+    // imageBlobList에서 Blob을 제외하고 주소값 복사가 아닌 완전한 값 복사
+    for(let imageName in imageBlobList) {
+        copiedImageBlobList[imageName] = {}
+        copiedImageBlobList[imageName].currentDownloadState = new Array(Math.ceil(imageBlobList[imageName].size / 16384))
+        copiedImageBlobList[imageName].size = imageBlobList[imageName].size
+    }
 
-    imageMetaData.flag = "imageMetaDataResponse"
+    console.log("copiedImageBlobList", copiedImageBlobList)
 
-    sendDataChannelList[pId].send(JSON.stringify(imageMetaData))
-    console.log("imageMetaData", imageMetaData)
+    sendDataChannelList[pId].send(JSON.stringify(copiedImageBlobList))
 }
 
 /* image data related */
