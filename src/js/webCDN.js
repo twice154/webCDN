@@ -13,13 +13,21 @@
 let receivePeerConnectionList = {}
 let receiveDataChannelList = {}
 
+// {
+//     peerID1(매칭된 상대 피어 소켓아이디) : { 
+//         RTCDataChannel
+//     },
+//     peerID2 : {
+//         RTCDataChannel
+//     },
+//     ...
+// }
 // 내가 데이터를 보내게 될 피어들
 let sendPeerConnectionList = {}
 let sendDataChannelList = {}
 
-/*
-let turnReady = false
-*/
+
+// let turnReady = false
 /* Some Constraints */
 let pcConstraint = {
     "iceServers": [{
@@ -387,12 +395,12 @@ function respondImageMetaDataToPeer(pId) {
 /* image data related */
 function requestImageToPeer(pId, startBlobNum, endBlobNum) {
     receiveDataChannelList[pId].send(JSON.stringify({
-        num : downloadStateImageBlobList.length,
+        name : firstRequestNum,
         startBlobNum,
         endBlobNum
     }))
     whoSendWhat[pId] = {
-        num : downloadStateImageBlobList.length,
+        name : downloadStateImageBlobList.length,
         startBlobNum,
         endBlobNum
     }
