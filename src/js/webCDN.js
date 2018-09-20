@@ -58,19 +58,28 @@ Blob : downloaded
 {
     name1 : {
         currentDownloadState : [Blob, Blob, Blob, Blob, undefined, undefined],
-        size : 30000
     },
     name2 : {
         currentDownloadState : [Blob, Blob, Blob, Blob, 1, 1, 1, 1, 1, 1, undefined, undefined, undefined, undefined, undefinde],
+    },
+    ...
+}
+*/
+let imageBlobList = {}
+/*
+{
+    name1 : {
+        size : 30000
+    },
+    name2 : {
         size : 10000
     },
     ...
 }
-imageMetaData로의 역할도 수행한다.
 */
-let imageBlobList = {}
+let imageMetaDataList = {}
 // 다르게 들어오는 metadata를 임시로 저장해놓기 위함
-let imageBlobMetaDataListTemp
+let imageMetaDataListTemp = {}
 // 총 몇명에게 image metadata를 요청할 것인가
 let imageBlobMetaDataRequestNum = 0
 
@@ -332,7 +341,8 @@ function startLoadImagesFromServer() {
                     imageBlobList[image.getAttribute("data-src")] = {}
                     imageBlobList[image.getAttribute("data-src")].currentDownloadState = res
 
-                    imageBlobList[image.getAttribute("data-src")].size = res.size
+                    imageMetaDataList[image.getAttribute("data-src")] = {}
+                    imageMetaDataList[image.getAttribute("data-src")].size = res.size
 
                     // for(let i=0; i<Math.ceil(res.size / 16384); i++) {
                     //     downloadStateImageBlobList[image.getAttribute("data-src")].push(2)
@@ -340,6 +350,7 @@ function startLoadImagesFromServer() {
                 })
     })
     socket.emit("allImageDownloadEnded", room)
+    console.log("imageMetaDataList", imageMetaDataList)
     console.log("imageBlobList", imageBlobList)
 }
 
@@ -349,23 +360,28 @@ function requestImageMetaDataToPeer(pId) {
 }
 
 function setImageMetaData(imageMetaData) {
-    imageBlobList = imageMetaData
-    console.log("received meta imateBlobList", imageBlobList)
+    if(Object.keys(imageMetaDataList).length === 0) {
+        imageMetaDataList = imageMetaData
+    } else if(Object.keys(imageMetaDataList).length !== 0 && Object.keys(imageMetaDataListTemp).length === 0) {
+        if(JSON.stringify(imageMetaDataList) !== JSON.stringify(imageMetaData)) {
+            imageMetaDataListTemp = imageMetaData
+        }
+    } else if(Object.keys(imageMetaDataList).length !== 0 && Object.keys(imageMetaDataListTemp).length !== 0) {
+        if(JSON.stringify(imageMetaDataList) === JSON.stringify(imageMetaData)) {
+            // imageMetaDataList = imageMetaData
+        } else if(JSON.stringify(imageMetaDataListTemp) === JSON.stringify(imageMetaData)) {
+            imageMetaDataList = imageMetaData
+        } else {
+            console.log("CRASHING IMAGE META DATA")
+        }
+    }
+
+    console.log("received imageMetaDataList", imageMetaDataList)
+    console.log("imageMetaDataListTemp is ", imageMetaDataListTemp)
 }
 
 function respondImageMetaDataToPeer(pId) {
-    let copiedImageBlobList = {}
-
-    // imageBlobList에서 Blob을 제외하고 주소값 복사가 아닌 완전한 값 복사
-    for(let imageName in imageBlobList) {
-        copiedImageBlobList[imageName] = {}
-        copiedImageBlobList[imageName].currentDownloadState = new Array(Math.ceil(imageBlobList[imageName].size / 16384))
-        copiedImageBlobList[imageName].size = imageBlobList[imageName].size
-    }
-
-    console.log("copiedImageBlobList", copiedImageBlobList)
-
-    sendDataChannelList[pId].send(JSON.stringify(copiedImageBlobList))
+    sendDataChannelList[pId].send(JSON.stringify(imageMetaDataList))
 }
 
 /* image data related */
