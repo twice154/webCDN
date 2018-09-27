@@ -243,6 +243,7 @@ function createPeerConnectionForReceiveChannel(pIdList) {
                     imageBlobMetaDataRequestNum += 1
                     console.log("requestImageMetaDataToPeer")
                 }
+                // 연결하는 피어의 수보다 이미지의 갯수가 무조건 더 많을 것이라고 가정
                 requestImageToPeer(pIdList[i], 0, 9)
             }
 
