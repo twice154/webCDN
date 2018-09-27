@@ -158,15 +158,15 @@ function determineOptimisticPeerNum() {
     return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
 }
 function determineOptimisticMetaDataPeerNum() {
-    return 1
+    return 2
 }
 function isJson(arrbuf) {
     try {
-        JSON.parse(arrbuf);
+        JSON.parse(arrbuf)
     } catch (e) {
-        return false;
+        return false
     }
-    return true;
+    return true  
 }
 
 //////////////////////////////////////////////////
