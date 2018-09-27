@@ -83,6 +83,7 @@ io.on("connection", (socket) => {
         let clientKeysInRoom = Object.keys(clientList[room])
         
         for(let i=0; i<clientKeysInRoom.length; i++) {
+            // 이 조건을 만족해서 for-loop을 탈출하는 것이 아니라, i가 마지막 값까지 다 올라가서 for-loop을 탈출하는 경우도 생길 수 있다.
             if(peerIdList.length === peerManage.determineOptimisticPeerIdArrayNum())
                 break
             if(clientList[room][clientKeysInRoom[i]].numOfCurrentUploadPeers < peerManage.determineOptimisticUploadPeerNum() && clientList[room][clientKeysInRoom[i]].downloaded) {

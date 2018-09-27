@@ -62,13 +62,15 @@ Image blob을 모아놓는 리스트, 전송과정에서 임시 blob 저장소 �
 undefined : to be downloaded
 1 : downloading
 Blob : downloaded
-// Downloaded의 경우에는 currentDownloadState : 하나의 단일 BLOB이 된다. Array가 아니다.
+// All Downloaded의 경우에는 downloaded flag가 FALSE에서 BLOB으로 바뀐다.
 {
     name1 : {
         currentDownloadState : [Blob, Blob, Blob, Blob, undefined, undefined],
+        downloaded : false
     },
     name2 : {
-        currentDownloadState : [Blob, Blob, Blob, Blob, 1, 1, 1, 1, 1, 1, undefined, undefined, undefined, undefined, undefinde],
+        currentDownloadState : [Blob, Blob, Blob, Blob, 1, 1, 1, 1, 1, 1, undefined, undefined, undefined, undefined, undefined],
+        downloaded : Blob
     },
     ...
 }
@@ -96,8 +98,7 @@ let imageBlobMetaDataRequestNum = 0
 // URL주소를 통해서 room 구분
 const room = "foo" // document.URL
 
-// 나중에 connectWebCDN 이라는 함수안에 묶어서 webCDN 접속기준에 대하여 정의 및 모듈화
-const socket = io()
+const socket = io(/* http://localhost:3000 */)
 
 if(room != '') {
     socket.emit("create or join", room)
@@ -128,8 +129,18 @@ socket.on("joined", function(roomInfo) {
 })
 socket.on("requestedPeerList", function(peerIdList) {
     if(Array.isArray(peerIdList)) {
-        createPeerConnectionForReceiveChannel(peerIdList)
-        console.log("requestPeerList : I'm newbie")
+        // 적절한 피어수가 할당되지 못함
+        if(peerIdList.length < determineOptimisticPeerNum() - 1) {
+            startLoadImagesFromServer()
+            console.log("requestedPeerList : Not enough # of peers")
+        } else if(peerIdList.length === determineOptimisticPeerNum() - 1) {
+            createPeerConnectionForReceiveChannel(peerIdList)
+            console.log("requestedPeerList : I'm newbie")
+        // 이유는 알 수 없지만 더 많은 수의 피어배열이 전달됨
+        } else {
+            startLoadImagesFromServer()
+            console.log("requestedPeerList : Exceed # of peers")
+        }
     } else if(typeof(peerIdList) === "string") {
         createPeerConnectionForSendChannel(peerIdList)
         console.log("requestPeerList : I'm oldbie")
@@ -154,9 +165,12 @@ socket.on("message", function(message) {
 
 //////////////////////////////////////////////////
 /* etc */
+// 한 피어가 전송받을 다른 피어들의 max 수.
+// 일단 임의로 10명으로 잡고 있지만, WebRTC Connection이 실패하는 경우까지 20% 오버헤드 생각해서 2명을 추가해서 12명으로 한다.
 function determineOptimisticPeerNum() {
     return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
 }
+// MetaData를 몇 명에게 요청할 것인가.
 function determineOptimisticMetaDataPeerNum() {
     return 2
 }
@@ -237,6 +251,7 @@ function createPeerConnectionForReceiveChannel(pIdList) {
             console.log("Received receive DataChannel")
 
             // DataChannel이 열렸을 때, sending peer에게 현재 필요한 type과 blob번호를 보낸다.
+            // 전송 에러가 나지 않는이상, 모든 클라이언트의 이미지 목록은 동일하다고 가정.
             receiveDataChannelList[pIdList[i]].onopen = function() {
                 if(imageBlobMetaDataRequestNum < determineOptimisticMetaDataPeerNum()) {
                     requestImageMetaDataToPeer(pIdList[i])
