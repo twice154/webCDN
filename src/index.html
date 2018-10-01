@@ -8,12 +8,19 @@
         <h1>webCDN TestBed</h1>
 
         <!-- lazy loaded from server first -->
-        <img id="wikipediaImage" alt="wikipedia" data-src="https://wikipedia.org/static/images/project-logos/frwiki-1.5x.png" src="">
-        <img id="naverImage" alt="naver" data-src="https://s.pstatic.net/static/www/mobile/edit/2018/0917/mobile_144816237114.jpg" src="">
-        <!-- loaded from p2p if I lazy load the first viewport user see -->
-        <img id="cityImage" alt="city" data-src="resource/4K City.jpg" src="">
-        <div id="backgroundImage" data-src="https://s.pstatic.net/static/www/mobile/edit/2018/0904/cropImg_166x108_136518491134958352.png" style="background-image: ''; height: 200px;"></div>
-        
+        <div id="wikipediaImage" image-src="https://wikipedia.org/static/images/project-logos/frwiki-1.5x.png" style="height: 200px;"></div>
+        <img id="naverImage" alt="naver" image-src="https://s.pstatic.net/static/www/mobile/edit/2018/0917/mobile_144816237114.jpg">
+        <img id="cityImage" alt="city" image-src="resource/4K City.jpg">
+        <img id="dog1" alt="dog1" image-src="https://farm5.staticflickr.com/4616/39798634951_aa270731f6_k_d.jpg">
+        <img id="dog2" alt="dog2" image-src="https://farm8.staticflickr.com/7364/9797687423_89d0b3040b_z_d.jpg">
+        <img id="dog3" alt="dog3" image-src="https://farm9.staticflickr.com/8713/16979768317_44c27d64c9_z_d.jpg">
+        <img id="dog4" alt="dog4" image-src="https://farm2.staticflickr.com/1717/24895045945_d99447e642_b_d.jpg">
+        <img id="dog5" alt="dog5" image-src="https://farm5.staticflickr.com/4745/38898563945_d3974144c0_z_d.jpg">
+        <img id="dog6" alt="dog6" image-src="https://farm2.staticflickr.com/1502/24195472655_bc7e4f3582_z_d.jpg">
+        <img id="dog7" alt="dog7" image-src="https://farm6.staticflickr.com/5691/23446613226_6ac1a5b1a2_z_d.jpg">
+        <div id="backgroundImage" image-src="https://s.pstatic.net/static/www/mobile/edit/2018/0904/cropImg_166x108_136518491134958352.png" style="height: 200px;"></div>
+        <img id="skyImage" alt="sky" image-src="resource/4K Sky.jpg">
+
         <!--
         <video id="cltemVideo" width="320" height="240" controls>
             <source id="cltemVideoSource" src="resource/cltem.mp4" type="video/mp4">
@@ -22,7 +29,7 @@
         -->
 
         <script src="webCDN/firstLazyLoad.js"></script>
-        <script src="/socket.io/socket.io.js"></script>
+        <script src="http://localhost:3000/socket.io/socket.io.js"></script>
         <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
         <script src="webCDN/webCDN.js"></script>
     </body>
