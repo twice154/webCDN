@@ -1,3 +1,5 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/* Modularization : firstLazyLoad.js */
 //////////////////////////////////////////////////
 /* Some checks for using webCDN environment
 1. Mobile Check
@@ -50,18 +52,42 @@ const browser = function () {
 }
 
 if (mobilecheck() || (browser() !== "Firefox" && browser() !== "Chrome" && browser() !== "Edge")) {
-    // do not starting webCDN
-    
-}
+    /* do not starting webCDN. */
+    //////////////////////////////////////////////////
+    // just loadAllImageFromSource() with no socket. do not have to modulatize, just copy & paste all codes.
+    const images = document.querySelectorAll("[image-src]")
 
-//////////////////////////////////////////////////
-/* Variable Initialize */
+    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
+    images.forEach(function(image, index) {
+        const imageSource = image.getAttribute("image-src")
+        if(!imageSource)
+            return
 
-//////////////////////////////////////////////////
-/* Lazy Load the first part of the webpage from server, because of UX */
+        fetch(`${image.getAttribute("image-src")}`)
+            .then(function(res) {
+                return res.blob()
+            })
+            .then(function(res) {
+                // html에서 이미지를 삽입한 케이스
+                if (image.getAttribute("src") !== null && image.getAttribute("src") === '') {
+                    image.src = URL.createObjectURL(res)
+                // css에서 이미지를 삽입한 케이스
+                } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
+                    image.style["background-image"] = `url(${URL.createObjectURL(res)})`
+                } else {
+                    console.log("There is not src tag or background-image property")
+                }
+            })
+    })
+    //////////////////////////////////////////////////
+    // do not insert related js scripts
 
-//////////////////////////////////////////////////
-/* Modularization : mediaFunction.js */
-function loadAllImagesFromSource() {
+} else {
+    /* starting webCDN. */
+    //////////////////////////////////////////////////
+    // Lazy Load the first part of the webpage from server, because of UX
 
+    //////////////////////////////////////////////////
+    // just executing function. webCDN.js를 jQuery처럼 실행가능한 형태로 만들어야 함
+    // webCDN.js()
 }
