@@ -60,6 +60,9 @@ let dcConstraint = null
 */
 let imageBlobs = {}
 
+// 내가 지금 몇 명의 피어에게 업로드하고 있는가. Upload Bandwidth를 조절하기 위해서
+let numOfCurrentUploads = 0
+
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
 // URL주소를 통해서 room 구분
@@ -92,7 +95,8 @@ socket.on("joined", function(info) {
     } else {
         /* Starting webCDN in earnest */
         // 1. Swarm 내에 있는 다른 피어들과 WebRTC 연결을 시도한다.
-
+        requestPeerConnection(Object.keys(mySwarm))
+        startingPeerConnection(Object.keys(mySwarm))
         // 2. n개의 이미지를 소스로부터 받아온다.
         loadRandomImagesFromSource(5)
         iterateRequestSwarmToServer(5000)
@@ -133,6 +137,69 @@ function determineMinimumPeerNumInSwarm() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
+function messageHandling(message) {
+
+}
+
+function requestPeerConnection(peerArray) {
+    for(let i = 0; i < peerArray.length; i++) {
+        sendMessage({
+            type: "requestPeerConnection",
+            fromSocket: socket.id,
+            toSocket: peerArray[i]
+        })
+    }
+}
+function startingPeerConnection(peerArray) {
+    for(let i = 0; i < peerArray.length; i++) {
+        rtcPeers[peerArray[i]] = {}
+        rtcPeers[peerArray[i]].pc = new RTCPeerConnection(pcConstraint)
+        console.log("Created new RTCPeerConnection")
+
+        rtcPeers[peerArray[i]].pc.onicecandidate = function(event) {
+            console.log("My icecandidate event : ", event)
+            if (event.candidate) {
+                sendMessage({
+                    type: "candidateFromReceive",
+                    label: event.candidate.sdpMLineIndex,
+                    id: event.candidate.sdpMid,
+                    candidate: event.candidate.candidate,
+                    fromSocket: socket.id,
+                    toSocket: peerArray[i]
+                })
+            } else {
+                console.log("My end of candidates")
+            }
+        }
+
+        rtcPeers[peerArray[i]].dc = rtcPeers[peerArray[i]].pc.createDataChannel(`from-${socket.id}-to-${peerArray[i]}`)
+        rtcPeers[peerArray[i]].dc.binaryType = "arraybuffer"
+        console.log("Created new RTCDataChannel")
+        
+        rtcPeers[peerArray[i]].dc.onopen = function() {
+
+        }
+        rtcPeers[peerArray[i]].dc.onmessage = function(event) {
+
+        }
+
+        rtcPeers[peerArray[i]].pc.createOffer(
+            function(sessionDescription) {
+                rtcPeers[peerArray[i]].pc.setLocalDescription(sessionDescription)
+                console.log("createOffer callback sending message", sessionDescription)
+            
+                sendMessage({
+                    sdp: sessionDescription,
+                    fromSocket: socket.id,
+                    toSocket: peerArray[i]
+                })
+            },
+            function(event) {
+                console.log("createOffer() error : ", event)
+            }
+        )
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
