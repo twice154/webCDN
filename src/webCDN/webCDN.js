@@ -77,7 +77,7 @@ if(room != '') {
 // Not useful in real application, just for checking in dev
 socket.on("created", function(room) {
     loadAllImagesFromSource()
-    iterateRequestSwarmToServer(1000)
+    // iterateRequestSwarmToServer(1000)
     console.log("Created room " + room)
 })
 socket.on("full", function(room) {
@@ -91,7 +91,7 @@ socket.on("joined", function(info) {
 
     if(Object.keys(mySwarm).length < determineMinimumPeerNumInSwarm()) {
         loadAllImagesFromSource()
-        iterateRequestSwarmToServer(1000)
+        // iterateRequestSwarmToServer(1000)
     } else {
         /* Starting webCDN in earnest */
         // 1. Swarm 내에 있는 다른 피어들과 WebRTC 연결을 시도한다.
@@ -99,7 +99,6 @@ socket.on("joined", function(info) {
         startingPeerConnection(Object.keys(mySwarm))
         // 2. n개의 이미지를 소스로부터 받아온다.
         loadRandomImagesFromSource(5)
-        iterateRequestSwarmToServer(5000)
         // 3. rtcPeer들에게 내가 가진 이미지에 대한 메타데이터를 전송한다.
 
     }
@@ -126,6 +125,7 @@ socket.on("message", function (message) {
 
 //////////////////////////////////////////////////
 /* etc */
+// downloaded 피어들에게 새로운 피어들을 찾아서 이미지를 전송해주기 위해서 사용됨
 function iterateRequestSwarmToServer(delay) {
     setInterval(function() {
         socket.emit("requestSwarm")
@@ -138,9 +138,50 @@ function determineMinimumPeerNumInSwarm() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
 function messageHandling(message) {
+    // RTCPeerConnection을 생성해서 자신과 연결하자는 신호
+    if(message.type = "requestPeerConnection") {
+        startingPeerConnectionBySignal(message.fromSocket)
+    // PeerConnection을 처음에 요청한 피어에서 ice candidate를 전송했을 때
+    } else if(message.type = "candidateFromNew" && rtcPeers[message.fromSocket].pc) {
+        let candidate = new RTCIceCandidate({
+            sdpMLineIndex: message.label,
+            candidate: message.candidate
+        })
+        rtcPeers[message.fromSocket].pc.addIceCandidate(candidate)
+    // PeerConnection 요청을 받은 피어에서 ice candidate를 전송했을 때
+    } else if(message.type = "candidateFromOld" && rtcPeers[message.fromSocket].pc) {
+        let candidate = new RTCIceCandidate({
+            sdpMLineIndex: message.label,
+            candidate: message.candidate
+        })
+        rtcPeers[message.fromSocket].pc.addIceCandidate(candidate)
+    // offer를 받았을 때
+    } else if(message.sdp.type = "offer" && rtcPeers[message.fromSocket].pc) {
+        rtcPeers[message.fromSocket].pc.setRemoteDescription(new RTCSessionDescription(message.sdp))
 
+        rtcPeers[message.fromSocket].pc.createAnswer(
+            function(sessionDescription) {
+                rtcPeers[message.fromSocket].pc.setLocalDescription(sessionDescription)
+                console.log("createAnswer callback sending message", sessionDescription)
+
+                sendMessage({
+                    sdp: sessionDescription,
+                    fromSocket: message.toSocket,
+                    toSocket: message.fromSocket
+                })
+            },
+            function (event) {
+                console.log('createAnswer() error: ', event)
+            }
+        )
+    // answer를 받았을 때
+    } else if(message.sdp.type = "answer" && rtcPeers[message.fromSocket].pc) {
+        console.log("I got an answer from remote socket : ", message.fromSocket)
+        rtcPeers[message.fromSocket].pc.setRemoteDescription(new RTCSessionDescription(message.sdp))
+    }
 }
 
+// 서버에게 다른 피어들에게 WebRTC Connection Request Signal을 뿌려달라고 한다.
 function requestPeerConnection(peerArray) {
     for(let i = 0; i < peerArray.length; i++) {
         sendMessage({
@@ -150,6 +191,7 @@ function requestPeerConnection(peerArray) {
         })
     }
 }
+// 능동적으로 PeerConnection을 생성하는 과정 : array 가 argument로 들어간다
 function startingPeerConnection(peerArray) {
     for(let i = 0; i < peerArray.length; i++) {
         rtcPeers[peerArray[i]] = {}
@@ -158,9 +200,9 @@ function startingPeerConnection(peerArray) {
 
         rtcPeers[peerArray[i]].pc.onicecandidate = function(event) {
             console.log("My icecandidate event : ", event)
-            if (event.candidate) {
+            if(event.candidate) {
                 sendMessage({
-                    type: "candidateFromReceive",
+                    type: "candidateFromNew",
                     label: event.candidate.sdpMLineIndex,
                     id: event.candidate.sdpMid,
                     candidate: event.candidate.candidate,
@@ -179,6 +221,7 @@ function startingPeerConnection(peerArray) {
         rtcPeers[peerArray[i]].dc.onopen = function() {
 
         }
+
         rtcPeers[peerArray[i]].dc.onmessage = function(event) {
 
         }
@@ -198,6 +241,44 @@ function startingPeerConnection(peerArray) {
                 console.log("createOffer() error : ", event)
             }
         )
+    }
+}
+// 서버를 통해서 PeerConnection을 생성해 달라는 요청을 받고나서 생성 : string이 argument로 들어간다
+function startingPeerConnectionBySignal(peerId) {
+    rtcPeers[peerId] = {}
+    rtcPeers[peerId].pc = new RTCPeerConnection(pcConstraint)
+    console.log("Created new RTCPeerConnection By Signal")
+
+    rtcPeers[peerId].pc.onicecandidate = function(event) {
+        console.log("My icecandidate event : ", event)
+
+        if(event.candidate) {
+            sendMessage({
+                type: "candidateFromOld",
+                label: event.candidate.sdpMLineIndex,
+                id: event.candidate.sdpMid,
+                candidate: event.candidate.candidate,
+                fromSocket: socket.id,
+                toSocket: peerId
+            })
+        } else {
+            console.log("My end of candidates")
+        }
+    }
+
+    rtcPeers[peerId].pc.ondatachannel = function(event) {
+        console.log("ondatachannel : ", event.channel)
+        rtcPeers[peerId].dc = event.channel
+        rtcPeers[peerId].dc.binaryType = "arraybuffer"
+        console.log("Received DataChannel")
+
+        rtcPeers[peerId].dc.onopen = function() {
+
+        }
+
+        rtcPeers[peerId].dc.onmessage = function(event) {
+
+        }
     }
 }
 
