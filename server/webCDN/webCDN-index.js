@@ -73,6 +73,9 @@ io.on("connection", (socket) => {
     socket.on("requestSwarm", () => {
         socket.emit("responseSwarm", organizeSwarm(Object.keys(socket.rooms)[1], 0))
     })
+    socket.on("downloadedAll", () => {
+        peerSwarm[Object.keys(socket.rooms)[1]][Object.keys(socket.rooms)[0]].downloaded = true
+    })
 
     // message handling from client
     socket.on("message", (message) => {
@@ -84,8 +87,9 @@ io.on("connection", (socket) => {
     // Built in event DISCONNECTING : when client disconnecting, server is running
     socket.on("disconnecting", (reason) => {
         // Object.keys(socket.rooms) returns [socketId, roomName]
-        delete peerSwarm[Object.keys(socket.rooms)[1]][Object.keys(socket.rooms)[0]]
+        // 마지막 room의 client가 나갈 때 에러를 뱉는다.
         console.log(`Client left server : socket.rooms=${JSON.stringify(socket.rooms, undefined, 2)}`)
+        delete peerSwarm[Object.keys(socket.rooms)[1]][Object.keys(socket.rooms)[0]]
     })
 
     function organizeSwarm(room, numOfPeersInSwarm) {

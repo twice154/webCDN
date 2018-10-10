@@ -59,9 +59,46 @@ let dcConstraint = null
 }
 */
 let imageBlobs = {}
+/*
+{
+    name1: {
+        size: 10000000
+    },
+    name2: {
+        ...
+    },
+    ...
+}
+*/
+let imageBlobsMeta = {}
+// imageBlobs는 un-downloaded인 size 0 짜리도 저장을 하지만, imageBlobsMeta는 다른 피어에게 본인이 가진 것들을 알려줘야 하기 때문에 저장하지 않는다.
 
 // 내가 지금 몇 명의 피어에게 업로드하고 있는가. Upload Bandwidth를 조절하기 위해서
 let numOfCurrentUploads = 0
+
+/* 새로운 피어가 접속했을때 데이터 주고받는 Convention
+1. Swarm 내에 이미 존재하는 피어들과 WebRTC 연결 [Async]
+2. n개의 img 다운로드 [Async]
+-------------------------------------------------- 위의 Async 작업들이 완료된 시점에서
+3. 새로운 피어가 본인의 img-metadata 전송
+4. 기존의 피어가 받고 싶은 img-name, 본인의 img-metadata 전송
+5. 새로운 피어가 img-file과, 받고 싶은 img-name, 본인의 img-metadata 전송
+6. 기존의 피어가 img-file과, 받고 싶은 img-name, 본인의 img-metadata 전송
+7. 5,6번의 과정을 두 피어가 모두 다운로드 완료될때까지 반복
+8. 두 피어가 모두 다운로드가 완료되면 서로의 RTCPeerConnection을 해제
+*/
+/* downloaded 피어가 데이터 주고받는 Convention
+1. 기존에 연결되어있는 피어들은 downloaded될 때까지 책임을 진다
+2. downloaded 피어와는 연결을 해제하고 새로운 non-downloaded 피어를 찾아서 연결 요청을 보낸다.
+3. 위의 새로운 피어가 접속했을때 데이터 주고받는 Convention 사용
+*/
+/*
+{
+    metadata : imageBlobsMeta,
+    want : imageBlobs에 있는 name 프로퍼티,
+    file : {name: imageBlobs에 있는 name 프로퍼티, startBlobNum: 0}
+}
+*/
 
 //////////////////////////////////////////////////
 /* Socket.io Initialize */
@@ -77,12 +114,22 @@ if(room != '') {
 // Not useful in real application, just for checking in dev
 socket.on("created", function(room) {
     loadAllImagesFromSource()
+        .then(function() {
+            // downloaded 피어가 데이터 주고받는 Convention에 따라서 진행
+
+        })
     // iterateRequestSwarmToServer(1000)
     console.log("Created room " + room)
 })
 socket.on("full", function(room) {
-    loadAllImagesFromSource()
     console.log("Room " + room + " is now full. You can't participate webCDN")
+    // socket을 서버에서 연결 해제한다
+    socket.close()
+    loadAllImagesFromSource()
+        .then(function() {
+            // downloaded 피어가 데이터 주고받는 Convention에 따라서 진행
+
+        })
 })
 socket.on("joined", function(info) {
     console.log("I joined room : " + info.room)
@@ -91,6 +138,10 @@ socket.on("joined", function(info) {
 
     if(Object.keys(mySwarm).length < determineMinimumPeerNumInSwarm()) {
         loadAllImagesFromSource()
+            .then(function() {
+                // downloaded 피어가 데이터 주고받는 Convention에 따라서 진행
+
+            })
         // iterateRequestSwarmToServer(1000)
     } else {
         /* Starting webCDN in earnest */
@@ -99,8 +150,6 @@ socket.on("joined", function(info) {
         startingPeerConnection(Object.keys(mySwarm))
         // 2. n개의 이미지를 소스로부터 받아온다.
         loadRandomImagesFromSource(5)
-        // 3. rtcPeer들에게 내가 가진 이미지에 대한 메타데이터를 전송한다.
-
     }
 })
 socket.on("responseSwarm", function(swarm) {
@@ -134,13 +183,22 @@ function iterateRequestSwarmToServer(delay) {
 function determineMinimumPeerNumInSwarm() {
     return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
 }
+function isJson(arrbuf) {
+    try {
+        JSON.parse(arrbuf)
+    } catch (e) {
+        return false
+    }
+    return true
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
 function messageHandling(message) {
     // RTCPeerConnection을 생성해서 자신과 연결하자는 신호
     if(message.type = "requestPeerConnection") {
-        startingPeerConnectionBySignal(message.fromSocket)
+        if(message.fromSocket !== socket.id)
+            startingPeerConnectionBySignal(message.fromSocket)
     // PeerConnection을 처음에 요청한 피어에서 ice candidate를 전송했을 때
     } else if(message.type = "candidateFromNew" && rtcPeers[message.fromSocket].pc) {
         let candidate = new RTCIceCandidate({
@@ -219,13 +277,19 @@ function startingPeerConnection(peerArray) {
         console.log("Created new RTCDataChannel")
         
         rtcPeers[peerArray[i]].dc.onopen = function() {
-
+            // 3. 새로운 피어가 본인의 img-metadata 전송
+            rtcPeers[peerArray[i]].dc.send(JSON.stringify({
+                metadata: JSON.stringify(imageBlobsMeta),
+                want: undefined,
+                file: undefined
+            }))
         }
 
         rtcPeers[peerArray[i]].dc.onmessage = function(event) {
 
         }
 
+        // sync 문제가 발생한다면, 상대방도 PeerConnection 생성을 완료했다는 시그널을 받은 후에 전송하도록 옮겨야함
         rtcPeers[peerArray[i]].pc.createOffer(
             function(sessionDescription) {
                 rtcPeers[peerArray[i]].pc.setLocalDescription(sessionDescription)
@@ -272,9 +336,9 @@ function startingPeerConnectionBySignal(peerId) {
         rtcPeers[peerId].dc.binaryType = "arraybuffer"
         console.log("Received DataChannel")
 
-        rtcPeers[peerId].dc.onopen = function() {
+        // rtcPeers[peerId].dc.onopen = function() {
 
-        }
+        // }
 
         rtcPeers[peerId].dc.onmessage = function(event) {
 
@@ -285,76 +349,36 @@ function startingPeerConnectionBySignal(peerId) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
 function loadAllImagesFromSource() {
-    const images = document.querySelectorAll("[image-src]")
+    return new Promise(function (resolve, reject) {
+        const images = document.querySelectorAll("[image-src]")
+        // images.length와 비교해서 값이 같아지면 downloaded라고 판단. async한 fetch호출에 대해서 sync를 맞추기 위함
+        let downloadedFlag = 0
 
-    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
-    images.forEach(function(image, index) {
-        const imageSource = image.getAttribute("image-src")
-        if (!imageSource)
-            return
-
-        fetch(`${image.getAttribute("image-src")}`)
-            .then(function(res) {
-                return res.blob()
-            })
-            .then(function(res) {
-                // html에서 이미지를 삽입한 케이스
-                if(image.getAttribute("src") !== null && image.getAttribute("src") === '') {
-                    image.src = URL.createObjectURL(res)
-                    // css에서 이미지를 삽입한 케이스
-                } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
-                    image.style["background-image"] = `url(${URL.createObjectURL(res)})`
-                } else {
-                    console.log("There is not src tag or background-image property")
-                }
-
-                // slicing the blob, and put them into imageBlobs
-                imageBlobs[imageSource] = {
-                    Blobs : [],
-                    size : res.size
-                }
-
-                // WebRTC DataChannel API Recommendation (16KB : 킬로바이트)
-                for(let i = 0; i < Math.ceil(res.size / 16384); i++) {
-                    imageBlobs[imageSource]["Blobs"][i] = res.slice(i * 16384, (i + 1) * 16384)
-                }
-            })
-    })
-    console.log("imageBlobs", imageBlobs)
-}
-function loadRandomImagesFromSource(loadImageNum) {
-    const images = document.querySelectorAll("[image-src]")
-
-    // 0 <= random < images.length 에 포함된 random n개를 추출해서 배열로 만든다.
-    loadImageIndex = []
-    while(loadImageIndex.length < loadImageNum) {
-        const random = Math.floor(Math.random() * images.length)
-        if(!loadImageIndex.includes(random))
-            loadImageIndex.push(random)
-    }
-
-    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
-    images.forEach(function (image, index) {
-        if(loadImageIndex.includes(index)) {
+        // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
+        images.forEach(function (image, index) {
             const imageSource = image.getAttribute("image-src")
-            if(!imageSource)
+            if (!imageSource)
                 return
 
+            // Async 호출 : 메인 쓰레드에서도 비동기적으로 실행된다.
             fetch(`${image.getAttribute("image-src")}`)
-                .then(function(res) {
+                .then(function (res) {
                     return res.blob()
                 })
-                .then(function(res) {
+                .then(function (res) {
                     // html에서 이미지를 삽입한 케이스
-                    if(image.getAttribute("src") !== null && image.getAttribute("src") === '') {
+                    if (image.getAttribute("src") !== null && image.getAttribute("src") === '') {
                         image.src = URL.createObjectURL(res)
                         // css에서 이미지를 삽입한 케이스
-                    } else if(image.style["background-image"] !== null && image.style["background-image"] === '') {
+                    } else if (image.style["background-image"] !== null && image.style["background-image"] === '') {
                         image.style["background-image"] = `url(${URL.createObjectURL(res)})`
                     } else {
                         console.log("There is not src tag or background-image property")
                     }
 
+                    imageBlobsMeta[imageSource] = {
+                        size: res.size
+                    }
                     // slicing the blob, and put them into imageBlobs
                     imageBlobs[imageSource] = {
                         Blobs: [],
@@ -362,15 +386,84 @@ function loadRandomImagesFromSource(loadImageNum) {
                     }
 
                     // WebRTC DataChannel API Recommendation (16KB : 킬로바이트)
-                    for(let i = 0; i < Math.ceil(res.size / 16384); i++) {
+                    for (let i = 0; i < Math.ceil(res.size / 16384); i++) {
                         imageBlobs[imageSource]["Blobs"][i] = res.slice(i * 16384, (i + 1) * 16384)
                     }
+
+                    downloadedFlag += 1;
+
+                    // downloaded이고, socket이 서버에 연결되어 있을 때(image 다운로드를 완료한 시점에서 sync를 맞추려면 여기 안에다가 작성해야함) -> Promise로 변환
+                    if (downloadedFlag === images.length && socket.connected) {
+                        socket.emit("downloadedAll")
+                        resolve()
+                    }
+                })
+        })
+        // fetch가 Async하긴한데, imageBlobs에 알맞은 값들이 출력된다.
+        console.log("imageBlobs", imageBlobs)
+    })
+}
+function loadRandomImagesFromSource(loadImageNum) {
+    const images = document.querySelectorAll("[image-src]")
+    // images.length와 비교해서 값이 같아지면 downloaded라고 판단. async한 fetch호출에 대해서 sync를 맞추기 위함
+    let downloadedNumFlag = 0
+
+    // 0 <= random < images.length 에 포함된 random n개를 추출해서 배열로 만든다.
+    loadImageIndex = []
+    while (loadImageIndex.length < loadImageNum) {
+        const random = Math.floor(Math.random() * images.length)
+        if (!loadImageIndex.includes(random))
+            loadImageIndex.push(random)
+    }
+
+    // fetch가 비동기적으로 일어나서 querySelectorAll에서 정렬된 NodeList의 순서는 고정적이지만, imageBlobList의 원소들 순서가 제각각이다. 또한 이들은 새로운 browser instance마다도 모두 다르다.
+    images.forEach(function (image, index) {
+        if (loadImageIndex.includes(index)) {
+            const imageSource = image.getAttribute("image-src")
+            if (!imageSource)
+                return
+
+            fetch(`${image.getAttribute("image-src")}`)
+                .then(function (res) {
+                    return res.blob()
+                })
+                .then(function (res) {
+                    // html에서 이미지를 삽입한 케이스
+                    if (image.getAttribute("src") !== null && image.getAttribute("src") === '') {
+                        image.src = URL.createObjectURL(res)
+                        // css에서 이미지를 삽입한 케이스
+                    } else if (image.style["background-image"] !== null && image.style["background-image"] === '') {
+                        image.style["background-image"] = `url(${URL.createObjectURL(res)})`
+                    } else {
+                        console.log("There is not src tag or background-image property")
+                    }
+
+                    imageBlobsMeta[imageSource] = {
+                        size: res.size
+                    }
+                    // slicing the blob, and put them into imageBlobs
+                    imageBlobs[imageSource] = {
+                        Blobs: [],
+                        size: res.size
+                    }
+
+                    // WebRTC DataChannel API Recommendation (16KB : 킬로바이트)
+                    for (let i = 0; i < Math.ceil(res.size / 16384); i++) {
+                        imageBlobs[imageSource]["Blobs"][i] = res.slice(i * 16384, (i + 1) * 16384)
+                    }
+
+                    downloadedNumFlag += 1;
+
+                    // Input num만큼의 이미지를 다운로드 했고, socket이 서버에 연결되어 있을 때(image 다운로드를 완료한 시점에서 sync를 맞추려면 여기 안에다가 작성해야함) -> Promise로 변환
+                    // if (downloadedNumFlag === loadImageNum && socket.connected) {
+                    
+                    // }
                 })
         } else {
             const imageSource = image.getAttribute("image-src")
-            if(!imageSource)
+            if (!imageSource)
                 return
-            
+
             imageBlobs[imageSource] = {
                 Blobs: [],
                 size: 0
