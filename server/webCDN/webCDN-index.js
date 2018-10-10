@@ -17,10 +17,10 @@ const io = socketIO(server)
 {
     room1 : {
         fghuirwhg343g324g34 : {
-            downloaded : false
+            imageDownloaded : false
         },
         f489hf3247g2hg8gw34f : {
-            downloaded : false
+            imageDownloaded : false
         },
         ...
     },
@@ -73,8 +73,8 @@ io.on("connection", (socket) => {
     socket.on("requestSwarm", () => {
         socket.emit("responseSwarm", organizeSwarm(Object.keys(socket.rooms)[1], 0))
     })
-    socket.on("downloadedAll", () => {
-        peerSwarm[Object.keys(socket.rooms)[1]][Object.keys(socket.rooms)[0]].downloaded = true
+    socket.on("imageDownloadedAll", () => {
+        peerSwarm[Object.keys(socket.rooms)[1]][Object.keys(socket.rooms)[0]].imageDownloaded = true
     })
 
     // message handling from client

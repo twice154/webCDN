@@ -74,7 +74,7 @@ let imageBlobsMeta = {}
 // imageBlobs는 un-downloaded인 size 0 짜리도 저장을 하지만, imageBlobsMeta는 다른 피어에게 본인이 가진 것들을 알려줘야 하기 때문에 저장하지 않는다.
 
 // 내가 지금 몇 명의 피어에게 업로드하고 있는가. Upload Bandwidth를 조절하기 위해서
-let numOfCurrentUploads = 0
+// let numOfCurrentUploads = 0
 
 /* 새로운 피어가 접속했을때 데이터 주고받는 Convention
 1. Swarm 내에 이미 존재하는 피어들과 WebRTC 연결 [Async]
@@ -82,8 +82,8 @@ let numOfCurrentUploads = 0
 -------------------------------------------------- 위의 Async 작업들이 완료된 시점에서
 3. 새로운 피어가 본인의 img-metadata 전송
 4. 기존의 피어가 받고 싶은 img-name, 본인의 img-metadata 전송
-5. 새로운 피어가 img-file과, 받고 싶은 img-name, 본인의 img-metadata 전송
-6. 기존의 피어가 img-file과, 받고 싶은 img-name, 본인의 img-metadata 전송
+5. 새로운 피어가 img-file과 ,,, 받고 싶은 img-name, 본인의 img-metadata 전송
+6. 기존의 피어가 img-file과 ,,, 받고 싶은 img-name, 본인의 img-metadata 전송
 7. 5,6번의 과정을 두 피어가 모두 다운로드 완료될때까지 반복
 8. 두 피어가 모두 다운로드가 완료되면 서로의 RTCPeerConnection을 해제
 */
@@ -94,9 +94,8 @@ let numOfCurrentUploads = 0
 */
 /*
 {
-    metadata : imageBlobsMeta,
-    want : imageBlobs에 있는 name 프로퍼티,
-    file : {name: imageBlobs에 있는 name 프로퍼티, startBlobNum: 0}
+    metadata : {imageBlobsMeta, videoBlobsMeta ...},
+    want : {imageBlobs에 있는 name 프로퍼티, startingBlobNum: 0} -> startingBlobNum부터 해서 10개 전송해준다. (0~9 번까지)
 }
 */
 
@@ -111,7 +110,6 @@ if(room != '') {
     console.log("Attempted to create or join room : ", room)
 }
 
-// Not useful in real application, just for checking in dev
 socket.on("created", function(room) {
     loadAllImagesFromSource()
         .then(function() {
@@ -127,12 +125,12 @@ socket.on("full", function(room) {
     socket.close()
     loadAllImagesFromSource()
         .then(function() {
-            // downloaded 피어가 데이터 주고받는 Convention에 따라서 진행
-
+            // do nothing
         })
 })
 socket.on("joined", function(info) {
     console.log("I joined room : " + info.room)
+    deleteMeInSwarm(info.yourSwarm)
     mySwarm = info.yourSwarm
     console.log("mySwarm is " + JSON.stringify(mySwarm, undefined, 2))
 
@@ -145,7 +143,7 @@ socket.on("joined", function(info) {
         // iterateRequestSwarmToServer(1000)
     } else {
         /* Starting webCDN in earnest */
-        // 1. Swarm 내에 있는 다른 피어들과 WebRTC 연결을 시도한다.
+        // 1. Swarm 내에 있는 다른 피어들과 WebRTC 연결을 시도한다. -> 그냥 WebRTC 연결이되기만 하면 되서 img-download와 sync를 맞출 필요가 없다
         requestPeerConnection(Object.keys(mySwarm))
         startingPeerConnection(Object.keys(mySwarm))
         // 2. n개의 이미지를 소스로부터 받아온다.
@@ -153,6 +151,7 @@ socket.on("joined", function(info) {
     }
 })
 socket.on("responseSwarm", function(swarm) {
+    deleteMeInSwarm(swarm)
     mySwarm = swarm
 })
 
@@ -191,29 +190,42 @@ function isJson(arrbuf) {
     }
     return true
 }
+// swarm을 서버에서 전송받으면 거기에 본인도 포함되어있어서, 본인과 WebRTC Connection하는 것을 방지하기 위해서
+function deleteMeInSwarm(swarm) {
+    delete swarm[socket.id]
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/* Modularization : torrentFunction.js */
+function pieceSelectionAlgorithm() {
+    return 0
+}
+
+/* TODO
+- Swarm에 있는 피어들이 모두 가지고 있지 않은 파일을 어떻게 식별하고 어느시점에 서버에서 불러올 것인가
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : webrtcFunction.js */
 function messageHandling(message) {
     // RTCPeerConnection을 생성해서 자신과 연결하자는 신호
     if(message.type = "requestPeerConnection") {
-        if(message.fromSocket !== socket.id)
-            startingPeerConnectionBySignal(message.fromSocket)
-    // PeerConnection을 처음에 요청한 피어에서 ice candidate를 전송했을 때
+        startingPeerConnectionBySignal(message.fromSocket)
+    // PeerConnection을 처음에 요청한 피어에서 ice candidate를 전송했을 때 -> sync 문제 생겼을 시 해결해야할 부분
     } else if(message.type = "candidateFromNew" && rtcPeers[message.fromSocket].pc) {
         let candidate = new RTCIceCandidate({
             sdpMLineIndex: message.label,
             candidate: message.candidate
         })
         rtcPeers[message.fromSocket].pc.addIceCandidate(candidate)
-    // PeerConnection 요청을 받은 피어에서 ice candidate를 전송했을 때
+    // PeerConnection 요청을 받은 피어에서 ice candidate를 전송했을 때 -> sync 문제 생겼을 시 해결해야할 부분
     } else if(message.type = "candidateFromOld" && rtcPeers[message.fromSocket].pc) {
         let candidate = new RTCIceCandidate({
             sdpMLineIndex: message.label,
             candidate: message.candidate
         })
         rtcPeers[message.fromSocket].pc.addIceCandidate(candidate)
-    // offer를 받았을 때
+    // offer를 받았을 때 -> sync 문제 생겼을 시 해결해야할 부분
     } else if(message.sdp.type = "offer" && rtcPeers[message.fromSocket].pc) {
         rtcPeers[message.fromSocket].pc.setRemoteDescription(new RTCSessionDescription(message.sdp))
 
@@ -278,11 +290,7 @@ function startingPeerConnection(peerArray) {
         
         rtcPeers[peerArray[i]].dc.onopen = function() {
             // 3. 새로운 피어가 본인의 img-metadata 전송
-            rtcPeers[peerArray[i]].dc.send(JSON.stringify({
-                metadata: JSON.stringify(imageBlobsMeta),
-                want: undefined,
-                file: undefined
-            }))
+            sendMetaDataBetweenPeer(rtcPeers[peerArray[i]].dc, false)
         }
 
         rtcPeers[peerArray[i]].dc.onmessage = function(event) {
@@ -346,6 +354,24 @@ function startingPeerConnectionBySignal(peerId) {
     }
 }
 
+function sendMetaDataBetweenPeer(peerDataChannel, wantActivate) {
+    if(wantActivate) {
+        peerDataChannel.send(JSON.stringify({
+            metadata: {
+                imageBlobsMeta
+            },
+            want: pieceSelectionAlgorithm()
+        }))
+    } else {
+        peerDataChannel.send(JSON.stringify({
+            metadata: {
+                imageBlobsMeta
+            },
+            want: undefined
+        }))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : mediaFunction.js */
 function loadAllImagesFromSource() {
@@ -394,7 +420,7 @@ function loadAllImagesFromSource() {
 
                     // downloaded이고, socket이 서버에 연결되어 있을 때(image 다운로드를 완료한 시점에서 sync를 맞추려면 여기 안에다가 작성해야함) -> Promise로 변환
                     if (downloadedFlag === images.length && socket.connected) {
-                        socket.emit("downloadedAll")
+                        socket.emit("imageDownloadedAll")
                         resolve()
                     }
                 })

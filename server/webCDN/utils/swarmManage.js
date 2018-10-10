@@ -4,7 +4,7 @@ module.exports.addRoomToSwarm = (peerSwarm, room) => {
 
 module.exports.addClientToRoom = (peerSwarm, room, socketId) => {
     const newClient = {
-        downloaded : false
+        imageDownloaded : false
     }
     peerSwarm[room][socketId] = newClient
 }
