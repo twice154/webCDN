@@ -73,6 +73,8 @@ let imageBlobs = {}
 let imageBlobsMeta = {}
 // imageBlobs는 un-downloaded인 size 0 짜리도 저장을 하지만, imageBlobsMeta는 다른 피어에게 본인이 가진 것들을 알려줘야 하기 때문에 저장하지 않는다.
 
+let pendingStack = []
+
 // 내가 지금 몇 명의 피어에게 업로드하고 있는가. Upload Bandwidth를 조절하기 위해서
 // let numOfCurrentUploads = 0
 
@@ -95,7 +97,7 @@ let imageBlobsMeta = {}
 /*
 {
     metadata : {imageBlobsMeta, videoBlobsMeta ...},
-    want : {imageBlobs에 있는 name 프로퍼티, startingBlobNum: 0} -> startingBlobNum부터 해서 10개 전송해준다. (0~9 번까지)
+    want : [imageBlobs에 있는 name 프로퍼티, startingBlobNum: 0] -> startingBlobNum부터 해서 10개 전송해준다. (0~9 번까지)
 }
 */
 
@@ -182,9 +184,9 @@ function iterateRequestSwarmToServer(delay) {
 function determineMinimumPeerNumInSwarm() {
     return 2 + 1 // +1 : 본인까지 방에 포함되기 때문에
 }
-function isJson(arrbuf) {
+function isJson(arrbuf, toJson) {
     try {
-        JSON.parse(arrbuf)
+        toJson = JSON.parse(arrbuf)
     } catch (e) {
         return false
     }
@@ -197,8 +199,11 @@ function deleteMeInSwarm(swarm) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Modularization : torrentFunction.js */
-function pieceSelectionAlgorithm() {
-    return 0
+// return : [imageBlobs에 있는 name 프로퍼티, startingBlobNum: 0]
+function pieceSelectionAlgorithm(peerMeta) {
+    // 1. pendingStack을 돌면서 관련있는 애들로
+    // 2. 본인의 imageBlobs를 역순으로 돌면서 다운로드 완료하지 못한 애들로
+    // 3. 상대의 metadata에서 본인의 imageMeta에 없는 애들로
 }
 
 /* TODO
@@ -290,7 +295,7 @@ function startingPeerConnection(peerArray) {
         
         rtcPeers[peerArray[i]].dc.onopen = function() {
             // 3. 새로운 피어가 본인의 img-metadata 전송
-            sendMetaDataBetweenPeer(rtcPeers[peerArray[i]].dc, false)
+            sendMetaDataBetweenPeer(rtcPeers[peerArray[i]].dc, false, undefined)
         }
 
         rtcPeers[peerArray[i]].dc.onmessage = function(event) {
@@ -349,18 +354,34 @@ function startingPeerConnectionBySignal(peerId) {
         // }
 
         rtcPeers[peerId].dc.onmessage = function(event) {
+            let peerMeta
+            // Blob이 아니라, 메타데이터를 받았을 때
+            if(isJson(event.data, peerMeta)) {
+                if(peerMeta.want) {
+                    // 원하는 블롭 전송 x10
 
+                    // 본인의 메타데이터 전송
+                    sendMetaDataBetweenPeer(rtcPeers[peerId].dc, true, peerMeta)
+                } else {
+                    // 본인의 메타데이터 전송
+                    sendMetaDataBetweenPeer(rtcPeers[peerId].dc, true, peerMeta)
+                }
+            } else {
+                // 받는 블롭 저장 x10
+
+            }
         }
     }
 }
 
-function sendMetaDataBetweenPeer(peerDataChannel, wantActivate) {
+function sendMetaDataBetweenPeer(peerDataChannel, wantActivate, peerMeta) {
     if(wantActivate) {
+        let want = pieceSelectionAlgorithm(peerMeta)
         peerDataChannel.send(JSON.stringify({
             metadata: {
                 imageBlobsMeta
             },
-            want: pieceSelectionAlgorithm()
+            want
         }))
     } else {
         peerDataChannel.send(JSON.stringify({
@@ -370,6 +391,14 @@ function sendMetaDataBetweenPeer(peerDataChannel, wantActivate) {
             want: undefined
         }))
     }
+    // want에 보낸 것들 pending
+    pendingWant(want)
+}
+// 다른 피어에게 want 요청 보낸 것에 대해 pending 해놓음. pieceSelectionAlgorithm에서 pending결과가 사용됨
+function pendingWant(want) {
+    pendingStack.push(want)
+    // imageBlobsMeta, imageBlobs update
+    
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
