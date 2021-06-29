@@ -1,8 +1,8 @@
-webCDN (Aborted!!)
+webCDN (Suspended!!)
 ==================
 
 
-This is the repository of webCDN, which is now aborted.  
+This is the repository of webCDN, which is now suspended.  
 
 
 If you want to see the concept of the project, please go to  
